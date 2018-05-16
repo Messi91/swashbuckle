@@ -3,14 +3,12 @@ package com.swashbuckle.sample
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, PathMatchers}
-import com.swashbuckle.annotations.SwashbuckleRoute
 import com.swashbuckle.sample.SampleModel.Message
 import fommil.sjs.FamilyFormats
 import spray.json._
 
 import scala.concurrent.Future
 
-@SwashbuckleRoute
 trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProtocol with FamilyFormats {
   private val pathSegment = "path"
   private val toPathSegment = "to"

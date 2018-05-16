@@ -1,5 +1,7 @@
 package com.swashbuckle.documentation
 
-class RouteDocumentation {
+import scala.meta._
+
+class RouteDocumentation(source: Source) {
 
 }
