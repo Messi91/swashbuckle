@@ -1,9 +1,9 @@
-package com.swashbuckle.sample
+package com.swashbuckle.service
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{Directives, PathMatchers}
-import com.swashbuckle.sample.SampleModel.Message
+import akka.http.scaladsl.server.{Directives, PathMatchers, Route}
+import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers.CsvSeq
 import fommil.sjs.FamilyFormats
 import spray.json._
 
@@ -43,8 +43,10 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
   private val getMessagesRoute = pathPrefix(pathSegment / toPathSegment / messagesPathSegment) {
     pathEndOrSingleSlash {
       get {
-        onSuccess(service.getMessages) { response =>
-          complete(StatusCodes.OK, response)
+        parameters('ids.as(CsvSeq[Long]).?, 'type.as[String].?, 'isPositive.as[Boolean].?) { (_, _, _) =>
+          onSuccess(service.getMessages) { response =>
+            complete(StatusCodes.OK, response)
+          }
         }
       }
     }
@@ -69,6 +71,12 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
       }
     }
   }
+
+  val sampleRoute: Route = createMessageRoute ~
+    updateMessageRoute ~
+    getMessagesRoute ~
+    getMessageRoute ~
+    deleteMessageRoute
 }
 
 class SampleService {
