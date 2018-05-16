@@ -1,4 +1,4 @@
-package com.mesfin.meta.annotations
+package com.swashbuckle.annotations
 
 import scala.annotation.StaticAnnotation
 import scala.collection.immutable

@@ -1,4 +1,4 @@
-package com.mesfin.meta.sample
+package com.swashbuckle.sample
 
 abstract class SampleServer {
 

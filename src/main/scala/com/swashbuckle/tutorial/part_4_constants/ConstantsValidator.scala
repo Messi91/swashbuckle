@@ -1,4 +1,4 @@
-package com.mesfin.meta.tutorial.part_4_constants
+package com.swashbuckle.tutorial.part_4_constants
 
 import java.io.File
 

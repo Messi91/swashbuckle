@@ -1,4 +1,4 @@
-package com.mesfin.meta.tutorial.part_2_parsing_code
+package com.swashbuckle.tutorial.part_2_parsing_code
 
 import scala.meta._
 

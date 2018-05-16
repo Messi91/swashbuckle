@@ -1,4 +1,4 @@
-package com.mesfin.meta.tutorial.part_3_tree
+package com.swashbuckle.tutorial.part_3_tree
 
 import scala.meta._
 

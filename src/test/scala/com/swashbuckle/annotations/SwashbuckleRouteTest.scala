@@ -1,6 +1,6 @@
-package com.mesfin.meta.annotations
+package com.swashbuckle.annotations
 
-import com.mesfin.meta.sample.SampleRoute
+import com.swashbuckle.sample.SampleRoute
 import org.scalatest.FunSpec
 
 class SwashbuckleRouteTest extends FunSpec {

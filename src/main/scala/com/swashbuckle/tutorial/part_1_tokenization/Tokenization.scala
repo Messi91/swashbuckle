@@ -1,4 +1,4 @@
-package com.mesfin.meta.tutorial.part_1_tokenization
+package com.swashbuckle.tutorial.part_1_tokenization
 
 import scala.meta._
 

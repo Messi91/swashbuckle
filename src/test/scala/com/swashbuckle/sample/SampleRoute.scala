@@ -1,10 +1,10 @@
-package com.mesfin.meta.sample
+package com.swashbuckle.sample
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, PathMatchers}
-import com.mesfin.meta.annotations.SwashbuckleRoute
-import com.mesfin.meta.sample.SampleModel.Message
+import com.swashbuckle.annotations.SwashbuckleRoute
+import com.swashbuckle.sample.SampleModel.Message
 import fommil.sjs.FamilyFormats
 import spray.json._
 

@@ -1,4 +1,4 @@
-package com.mesfin.meta.tutorial.part_5_object_name
+package com.swashbuckle.tutorial.part_5_object_name
 
 import java.io.{File, FileWriter}
 
