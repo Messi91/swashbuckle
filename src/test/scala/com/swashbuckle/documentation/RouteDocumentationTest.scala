@@ -100,7 +100,13 @@ class RouteDocumentationTest extends FunSpec with Matchers {
 
       //expected shouldBe RoutesDocumentation(source)
 
-      println(RoutesDocumentation.extractImports(source))
+      import RoutesDocumentation._
+      val (packageName, code) = extractCode(source)
+      println(packageName)
+      println
+      println(extractImports(code).mkString("\n"))
+      println
+      println(extractSegments(extractTraitBody(code)).mkString("\n"))
     }
   }
 }

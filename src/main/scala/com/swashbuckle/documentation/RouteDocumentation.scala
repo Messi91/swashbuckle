@@ -4,6 +4,8 @@ import com.swashbuckle.documentation.Fields._
 
 import scala.meta._
 
+case class PathSegment(name: String, value: String)
+
 case class RouteDocumentation(
   operationId: String,
   method: Method,
@@ -17,13 +19,32 @@ object RoutesDocumentation {
     ???
   }
 
-  def extractImports(source: Source): Seq[String] = source match {
+  private[documentation] def extractCode(source: Source): (String, Seq[Stat]) = source match {
     case source"..$packages" => packages.collect {
-      case q"package $packageName { ..$code }" => code.collect {
-        case q"import ..$imported" => imported.map(_.toString)
+      case q"package $packageName { ..$code }" => (packageName.toString, code)
+    }.groupBy(_._1).map(item => (item._1, item._2.flatMap(_._2))).head
+  }
+
+  private[documentation] def extractImports(code: Seq[Stat]): Seq[String] = {
+    code.collect {
+      case q"import ..$imported" => imported.map(_.toString)
+    }.flatten
+  }
+
+  private[documentation] def extractTraitBody(code: Seq[Stat]): Seq[Stat] = {
+    code.collect {
+      case q"..$mods trait $tname[..$tparams] extends $template" => template.collect {
+        case template"{ ..$code } with ..$inits { $self => ..$stats }" => stats
       }.flatten
     }.flatten
   }
 
-
+  private[documentation] def extractSegments(code: Seq[Stat]): Seq[PathSegment] = {
+    def inQuotes(value: Term): Boolean = {
+      value.toString.startsWith("\"") && value.toString.endsWith("\"")
+    }
+    code.collect {
+      case q"..$mods val ..$name = $value" if inQuotes(value) => PathSegment(name.head.toString, value.toString)
+    }
+  }
 }
