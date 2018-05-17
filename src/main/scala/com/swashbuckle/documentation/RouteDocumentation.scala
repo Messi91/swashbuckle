@@ -106,11 +106,19 @@ object RoutesDocumentation {
     parameters.map { parameter =>
       val Array(name, typeName) = parameter.split("as(")
       val required = !parameter.endsWith("?")
-      QueryParameter(
-        name = name.drop(0),
-        `type` = typeName.split(")").head,
-        required = required
-      )
+      if (typeName.contains("[")) {
+        ArrayQueryParameter(
+          name = name.drop(0),
+          `type` = typeName.split(")").head,
+          required = required
+        )
+      } else {
+        QueryParameter(
+          name = name.drop(0),
+          `type` = typeName.split(")").head,
+          required = required
+        )
+      }
     }
   }
 }
