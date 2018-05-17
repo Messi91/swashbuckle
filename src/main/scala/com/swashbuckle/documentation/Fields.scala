@@ -17,9 +17,9 @@ object Fields {
 
   case class PathParameter(name: String, `type`: String) extends Parameter
 
-  case class QueryParameter(name: String, required: Boolean, `type`: String) extends Parameter
+  case class QueryParameter(name: String, `type`: String, required: Boolean) extends Parameter
 
-  case class ArrayQueryParameter(name: String, required: Boolean, collectionFormat: String, `type`: String) extends Parameter
+  case class ArrayQueryParameter(name: String, `type`: String, collectionFormat: String, required: Boolean) extends Parameter
 
   case class BodyParameter(name: String, schema: String) extends Parameter
 
