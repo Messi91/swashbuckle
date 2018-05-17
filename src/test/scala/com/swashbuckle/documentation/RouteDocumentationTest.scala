@@ -98,7 +98,9 @@ class RouteDocumentationTest extends FunSpec with Matchers {
 
       val source = new File("src/main/scala/com/swashbuckle/service/SampleRoute.scala").parse[Source].get
 
-      expected shouldBe RoutesDocumentation(source)
+      //expected shouldBe RoutesDocumentation(source)
+
+      println(RoutesDocumentation.extractImports(source))
     }
   }
 }

@@ -8,7 +8,7 @@ object ConstantsValidator extends App {
   case class Val(valName: scala.meta.Pat, valValue: String)
 
   def validate(source: Source): Unit = source match {
-    case source"..$stats" => stats.collect(_ match {
+    case source"..$stats" => stats.collect({
       case q"..$mods object ${Term.Name(name)} extends $template" => name match{
         case "Constants" => template match {
           case template"{ ..$stats2 } with ..$ctorcalls { $param => ..$stats3 }" =>{
