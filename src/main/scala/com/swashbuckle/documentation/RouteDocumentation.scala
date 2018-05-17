@@ -6,6 +6,8 @@ import scala.meta._
 
 case class PathSegment(name: String, value: String)
 
+case class RouteDef(name: String, value: String)
+
 case class RouteDocumentation(
   operationId: String,
   method: Method,
@@ -34,7 +36,7 @@ object RoutesDocumentation {
   private[documentation] def extractTraitBody(code: Seq[Stat]): Seq[Stat] = {
     code.collect {
       case q"..$mods trait $tname[..$tparams] extends $template" => template.collect {
-        case template"{ ..$code } with ..$inits { $self => ..$stats }" => stats
+        case template"{ ..$stats1 } with ..$inits { $self => ..$stats2 }" => stats2
       }.flatten
     }.flatten
   }
@@ -45,6 +47,15 @@ object RoutesDocumentation {
     }
     code.collect {
       case q"..$mods val ..$name = $value" if inQuotes(value) => PathSegment(name.head.toString, value.toString)
+    }
+  }
+
+  private[documentation] def extractRouteDefs(code: Seq[Stat]): Seq[RouteDef] = {
+    def isRouteDef(value: Term): Boolean = {
+      value.toString.startsWith("path(") || value.toString.startsWith("pathPrefix(")
+    }
+    code.collect {
+      case q"..$mods val ..$name = $value" if isRouteDef(value) => RouteDef(name.head.toString, value.toString)
     }
   }
 }
