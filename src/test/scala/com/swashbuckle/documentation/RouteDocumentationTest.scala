@@ -100,20 +100,7 @@ class RouteDocumentationTest extends FunSpec with Matchers {
 
       //expected shouldBe RoutesDocumentation(source)
 
-      import RoutesDocumentation._
-      val (packageName, code) = extractCode(source)
-      val imports = extractImports(code)
-      val traitBody = extractTraitBody(code)
-      val pathSegments = extractSegments(traitBody)
-      val routeDefs = extractRouteDefs(traitBody)
-
-      println(packageName)
-      println
-      println(imports.mkString("\n"))
-      println
-      println(pathSegments.mkString("\n"))
-      println
-      println(routeDefs.mkString("\n"))
+      println(RoutesDocumentation(source))
     }
   }
 }

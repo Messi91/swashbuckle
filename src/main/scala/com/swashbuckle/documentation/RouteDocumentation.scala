@@ -14,22 +14,26 @@ case class MethodDef(
 case class RouteDef(
   name: String,
   method: Method,
-  path: List[String],
-  parameters: List[Parameter],
-  responses: List[Response]
+  path: Seq[String],
+  parameters: Seq[Parameter],
+  responses: Seq[Response]
 )
 
 case class RouteDocumentation(
   operationId: String,
   method: Method,
   path: String,
-  parameters: List[Parameter],
-  responses: List[Response]
+  parameters: Seq[Parameter],
+  responses: Seq[Response]
 )
 
 object RoutesDocumentation {
-  def apply(source: Source): List[RouteDocumentation] = {
-    ???
+  def apply(source: Source): Seq[RouteDef] = {
+    val (packageName, code) = extractCode(source)
+    val imports = extractImports(code)
+    val traitBody = extractTraitBody(code)
+    val pathSegments = extractSegments(traitBody)
+    extractRouteDefs(traitBody)
   }
 
   private[documentation] def extractCode(source: Source): (String, Seq[Stat]) = source match {
@@ -62,23 +66,32 @@ object RoutesDocumentation {
   }
 
   private[documentation] def extractRouteDefs(code: Seq[Stat]): Seq[RouteDef] = {
-    def isRouteDef(definition: Term): Boolean = {
-      definition.toString.startsWith("path(") || definition.toString.startsWith("pathPrefix(")
+    def isRouteDef(routeDef: Term): Boolean = {
+      routeDef.toString.startsWith("path(") || routeDef.toString.startsWith("pathPrefix(")
     }
     code.collect {
-      case q"..$mods val ..$name = $definition" if isRouteDef(definition) =>
-        val methodDefs = extractMethodDefs(definition.toString)
-
-        RouteDef(name.head.toString, definition.toString)
-    }
+      case q"..$mods val ..$name = $routeDef" if isRouteDef(routeDef) =>
+        val routeName = name.head.toString
+        val path = extractPath(routeDef.toString)
+        val methodDefs = extractMethodDefs(routeDef.toString)
+        methodDefs.map { methodDef =>
+          RouteDef(
+            name = routeName,
+            method = methodDef.method,
+            path = path,
+            parameters = extractParameters(methodDef.body),
+            responses = Nil
+          )
+        }
+    }.flatten
   }
 
-  private def extractMethodDefs(definition: String): Seq[MethodDef] = {
+  private def extractMethodDefs(routeDef: String): Seq[MethodDef] = {
     "get {" :: "post {" :: "put {" :: "delete {" :: Nil collect {
-      case methodStart if definition.contains(methodStart) =>
-        val start = definition.indexOf(methodStart)
-        val finish = definition.substring(start).indexOf("}")
-        val body = definition.substring(start, finish)
+      case methodStart if routeDef.contains(methodStart) =>
+        val start = routeDef.indexOf(methodStart)
+        val finish = routeDef.indexOf("}")
+        val body = routeDef.substring(start, finish)
         val method = getMethodType(methodStart)
         MethodDef(method = method, body = body)
     }
@@ -91,34 +104,40 @@ object RoutesDocumentation {
     case "delete {" => Delete
   }
 
-  private def extractPath(definition: String): Seq[String] = {
+  private def extractPath(routeDef: String): Seq[String] = {
     val keyword = "pathPrefix("
-    val start = definition.indexOf(keyword) + keyword.size
-    val finish = definition.indexOf(")")
-    definition.substring(start, finish).split("/").map(_.trim)
+    val start = routeDef.indexOf(keyword) + keyword.length
+    val finish = routeDef.indexOf(")")
+    routeDef.substring(start, finish).split("/").map(_.trim)
   }
 
-  private def extractParameters(methodDef: String): Seq[QueryParameter] = {
+  private def extractParameters(methodDef: String): Seq[Parameter] = {
     val keyword = "parameters("
-    val start = methodDef.indexOf(keyword) + keyword.length
-    val finish = methodDef.indexOf(")")
-    val parameters = methodDef.substring(start, finish).split(",").map(word => word.trim)
-    parameters.map { parameter =>
-      val Array(name, typeName) = parameter.split("as(")
-      val required = !parameter.endsWith("?")
-      if (typeName.contains("[")) {
-        ArrayQueryParameter(
-          name = name.drop(0),
-          `type` = typeName.split(")").head,
-          required = required
-        )
-      } else {
-        QueryParameter(
-          name = name.drop(0),
-          `type` = typeName.split(")").head,
-          required = required
-        )
+    if (methodDef.contains(keyword)) {
+      val start = methodDef.indexOf(keyword) + keyword.length
+      val finish = methodDef.indexOf(")")
+      val parameters = methodDef.substring(start, finish).split(",").map(word => word.trim)
+      parameters.map { parameter =>
+        val Array(name, typeName) = parameter.split(".as\\(")
+        val required = !parameter.endsWith("?")
+        val trimmedType = typeName.split("\\)").head
+        if (trimmedType.contains("[")) {
+          val collectionType = trimmedType.split("\\[").head
+          val innerType = trimmedType.substring(trimmedType.indexOf("[") + 1, trimmedType.indexOf("]"))
+          ArrayQueryParameter(
+            name = name.drop(0),
+            `type` = innerType,
+            collectionFormat = collectionType,
+            required = required
+          )
+        } else {
+          QueryParameter(
+            name = name.drop(0),
+            `type` = trimmedType,
+            required = required
+          )
+        }
       }
-    }
+    } else Nil
   }
 }
