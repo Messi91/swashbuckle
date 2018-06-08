@@ -1,4 +1,6 @@
-package com.swashbuckle.documentation
+package com.swashbuckle.components
+
+import Fields._
 
 object Fields {
 
@@ -25,4 +27,24 @@ object Fields {
 
 
   case class Response(status: Int, schema: String)
+}
+
+object Components {
+
+  case class PathSegment(name: String, value: String)
+
+  case class MethodDef(
+    method: Method,
+    body: String
+  )
+
+  case class RouteDef(
+    name: String,
+    method: Method,
+    path: Seq[String],
+    parameters: Seq[Parameter],
+    responses: Seq[Response]
+  )
+
+  // case class ServerDocumentation()
 }

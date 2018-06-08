@@ -1,5 +1,5 @@
 package com.swashbuckle.documentation
 
-class SwashbuckleDocumentation {
+trait SwashbuckleGenerator {
 
 }

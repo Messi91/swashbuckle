@@ -2,19 +2,20 @@ package com.swashbuckle.documentation
 
 import java.io.File
 
-import com.swashbuckle.documentation.Fields._
+import com.swashbuckle.components.Components.RouteDef
+import com.swashbuckle.components.Fields._
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.meta._
 
-class RouteDocumentationTest extends FunSpec with Matchers {
+class ServerDocumentationTest extends FunSpec with Matchers {
 
   describe("a route documentation") {
     it("should be created from an appropriate source file") {
-      val createMessageRoute = RouteDocumentation(
-        operationId = "createMessage",
+      val createMessageRoute = RouteDef(
+        name = "createMessage",
         method = Post,
-        path = "/path/to/messages",
+        path = "path" :: "to" :: "messages" :: Nil,
         parameters = BodyParameter(
           name = "message",
           schema = "com.swashbuckle.service.Message"
@@ -25,10 +26,10 @@ class RouteDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val updateMessageRoute = RouteDocumentation(
-        operationId = "updateMessage",
+      val updateMessageRoute = RouteDef(
+        name = "updateMessage",
         method = Put,
-        path = "/path/to/messages/{id}",
+        path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
           `type` = "long"
@@ -42,10 +43,10 @@ class RouteDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val getMessagesRoute = RouteDocumentation(
-        operationId = "getMessages",
+      val getMessagesRoute = RouteDef(
+        name = "getMessages",
         method = Get,
-        path = "/path/to/messages",
+        path = "path" :: "to" :: "messages" :: Nil,
         parameters = ArrayQueryParameter(
           name = "ids",
           required = false,
@@ -66,10 +67,10 @@ class RouteDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val getMessageRoute = RouteDocumentation(
-        operationId = "getMessage",
+      val getMessageRoute = RouteDef(
+        name = "getMessage",
         method = Get,
-        path = "/path/to/messages/{id}",
+        path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
           `type` = "long"
@@ -80,10 +81,10 @@ class RouteDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val deleteMessageRoute = RouteDocumentation(
-        operationId = "deleteMessage",
+      val deleteMessageRoute = RouteDef(
+        name = "deleteMessage",
         method = Delete,
-        path = "/path/to/messages/{id}",
+        path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
           `type` = "long"
@@ -100,7 +101,7 @@ class RouteDocumentationTest extends FunSpec with Matchers {
 
       //expected shouldBe RoutesDocumentation(source)
 
-      println(RoutesDocumentation(source))
+      println(ServerDocumentation(source))
     }
   }
 }
