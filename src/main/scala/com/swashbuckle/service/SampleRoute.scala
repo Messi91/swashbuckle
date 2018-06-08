@@ -28,7 +28,7 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
     }
   }
 
-  private val updateMessageRoute = pathPrefix(pathSegment / toPathSegment / messagesPathSegment / PathMatchers.LongNumber) { id =>
+  private val updateMessageRoute = pathPrefix(pathSegment / toPathSegment / PathMatchers.JavaUUID / messagesPathSegment / PathMatchers.LongNumber) { case (uuid, id) =>
     pathEndOrSingleSlash {
       put {
         entity(as[Message]) { update =>

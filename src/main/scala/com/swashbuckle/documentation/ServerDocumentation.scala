@@ -127,19 +127,13 @@ object ServerDocumentation {
   }
 
   private def extractPathParameters(path: Seq[String], pathDef: String): Seq[PathParameter] = {
-    val start = pathDef.indexOf("{")
+    val start = pathDef.indexOf("{") + 1
     val finish = pathDef.indexOf("=>")
-    val segment = pathDef.substring(start + 1, finish).trim
+    val segment = pathDef.substring(start, finish).trim
     val parameterNames: Seq[String] = {
       if (segment == "_") Seq("?")
-      else if (segment.startsWith("case")) {
-        val innerStart = segment.indexOf("case (")
-        val innerFinish = segment.lastIndexOf(")")
-        val innerSegment = segment.substring(innerStart, innerFinish)
-        innerSegment.split(",").map(_.trim).toSeq
-      }
-      else if (segment.startsWith("(")) {
-        val innerStart = segment.indexOf("(")
+      else if (segment.startsWith("case") || segment.startsWith("(")) {
+        val innerStart = segment.indexOf("(") + 1
         val innerFinish = segment.lastIndexOf(")")
         val innerSegment = segment.substring(innerStart, innerFinish)
         innerSegment.split(",").map(_.trim).toSeq
