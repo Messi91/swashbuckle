@@ -29,6 +29,19 @@ object Fields {
   case class Response(status: Int, schema: String)
 }
 
+object ParameterTypes extends Enumeration {
+
+  type ParameterType = Value
+
+  val IntNumber = Value(0, "IntNumber")
+
+  val LongNumber = Value(1, "LongNumber")
+
+  val DoubleNumber = Value(2, "DoubleNumber")
+
+  val JavaUUID = Value(3, "JavaUUID")
+}
+
 object Components {
 
   case class PathSegment(name: String, value: String)

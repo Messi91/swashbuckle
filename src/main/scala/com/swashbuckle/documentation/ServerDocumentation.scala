@@ -2,8 +2,11 @@ package com.swashbuckle.documentation
 
 import com.swashbuckle.components.Components._
 import com.swashbuckle.components.Fields._
+import com.swashbuckle.components.ParameterTypes
+import com.swashbuckle.components.ParameterTypes.ParameterType
 
 import scala.meta._
+import scala.util.Try
 
 object ServerDocumentation {
   def apply(source: Source): Seq[RouteDef] = {
@@ -89,18 +92,61 @@ object ServerDocumentation {
     val start = routeDef.indexOf(keyword) + keyword.length
     val finish = routeDef.indexOf("\n")
     val segment = routeDef.substring(start, finish).trim
-    val path = segment.substring(0, segment.indexOf(")")).split("/").map(_.trim)
-
+    val path = segment.substring(0, segment.indexOf(")")).split("/").map(_.trim).toSeq
     if(segment.endsWith("=>")) {
-      (path, extractPathParameters(segment))
-    }
-    else (path, Nil)
+      val pathParameters = extractPathParameters(path, segment)
+      val integratedPath = integratePathWithParameters(path, pathParameters)
+      (integratedPath, pathParameters)
+    } else (path, Nil)
   }
 
-  private def extractPathParameters(pathDef: String): Seq[PathParameter] = {
+  private def extractPathParameters(path: Seq[String], pathDef: String): Seq[PathParameter] = {
     val start = pathDef.indexOf("{")
     val finish = pathDef.indexOf("=>")
+    val segment = pathDef.substring(start + 1, finish).trim
+    val parameterNames: Seq[String] = {
+      if (segment == "_") Seq("?")
+      else if (segment.startsWith("case")) {
+        val innerStart = segment.indexOf("case (")
+        val innerFinish = segment.lastIndexOf(")")
+        val innerSegment = segment.substring(innerStart, innerFinish)
+        innerSegment.split(",").map(_.trim).toSeq
+      }
+      else if (segment.startsWith("(")) {
+        val innerStart = segment.indexOf("(")
+        val innerFinish = segment.lastIndexOf(")")
+        val innerSegment = segment.substring(innerStart, innerFinish)
+        innerSegment.split(",").map(_.trim).toSeq
+      }
+      else Seq(segment)
+    }
+    val parameterTypes: Seq[ParameterType] = path.flatMap(getParameterType)
+    val pairSequence: Seq[(String, ParameterType)] = parameterNames.zip(parameterTypes)
+    pairSequence.map { case (name, typeName) => PathParameter(name, typeName.toString) }
+  }
 
+  private def getParameterType(pathSegment: String): Option[ParameterType] = {
+    val parameterType = {
+      if (pathSegment.startsWith("PathMatchers.")) {
+        pathSegment.split("\\.")(1)
+      } else pathSegment
+    }
+    Try(ParameterTypes.withName(parameterType)).toOption
+  }
+
+  private def isParameterType(pathSegment: String): Boolean = {
+    getParameterType(pathSegment).nonEmpty
+  }
+
+  private def integratePathWithParameters(path: Seq[String], pathParameters: Seq[PathParameter]): Seq[String] = {
+    pathParameters match {
+      case Nil => path
+      case _ => path match {
+        case Nil => Nil
+        case head :: tail if isParameterType(head) => Seq(pathParameters.head.name) ++ integratePathWithParameters(tail, pathParameters.tail)
+        case other => Seq(other.head) ++ integratePathWithParameters(other.tail, pathParameters)
+      }
+    }
   }
 
   private def extractQueryParameters(methodDef: String): Seq[Parameter] = {
@@ -108,7 +154,7 @@ object ServerDocumentation {
     if (methodDef.contains(keyword)) {
       val start = methodDef.indexOf(keyword) + keyword.length
       val finish = methodDef.indexOf(")")
-      val queryParameters = methodDef.substring(start, finish).split(",").map(word => word.trim)
+      val queryParameters = methodDef.substring(start, finish).split(",").map(word => word.trim).toSeq
       queryParameters.map { parameter =>
         val Array(name, typeName) = parameter.split(".as\\(")
         val required = !parameter.endsWith("?")
@@ -117,14 +163,14 @@ object ServerDocumentation {
           val collectionType = trimmedType.split("\\[").head
           val innerType = trimmedType.substring(trimmedType.indexOf("[") + 1, trimmedType.indexOf("]"))
           ArrayQueryParameter(
-            name = name.drop(0),
+            name = name.drop(1),
             `type` = innerType,
             collectionFormat = collectionType,
             required = required
           )
         } else {
           QueryParameter(
-            name = name.drop(0),
+            name = name.drop(1),
             `type` = trimmedType,
             required = required
           )
