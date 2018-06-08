@@ -14,7 +14,7 @@ object ServerDocumentation {
     val imports = extractImports(code)
     val traitBody = extractTraitBody(code)
     val pathSegments = extractSegments(traitBody)
-    extractRouteDefs(traitBody)
+    extractRouteDefs(traitBody, pathSegments)
   }
 
   private def extractCode(source: Source): (String, Seq[Stat]) = source match {
@@ -42,12 +42,16 @@ object ServerDocumentation {
       value.toString.startsWith("\"") && value.toString.endsWith("\"")
     }
 
+    def sanitizeString(str: String) = {
+      str.replaceAll("\"", "")
+    }
+
     code.collect {
-      case q"..$mods val ..$name = $value" if inQuotes(value) => PathSegment(name.head.toString, value.toString)
+      case q"..$mods val ..$name = $value" if inQuotes(value) => PathSegment(name.head.toString, sanitizeString(value.toString))
     }
   }
 
-  private def extractRouteDefs(code: Seq[Stat]): Seq[RouteDef] = {
+  private def extractRouteDefs(code: Seq[Stat], pathSegments: Seq[PathSegment]): Seq[RouteDef] = {
     def isRouteDef(routeDef: Term): Boolean = {
       routeDef.toString.startsWith("path(") || routeDef.toString.startsWith("pathPrefix(")
     }
@@ -55,7 +59,7 @@ object ServerDocumentation {
     code.collect {
       case q"..$mods val ..$name = $routeDef" if isRouteDef(routeDef) =>
         val routeName = name.head.toString
-        val (path, pathParameters) = extractPath(routeDef.toString)
+        val (path, pathParameters) = extractPath(routeDef.toString, pathSegments)
         val methodDefs = extractMethodDefs(routeDef.toString)
         methodDefs.map { methodDef =>
           RouteDef(
@@ -87,7 +91,7 @@ object ServerDocumentation {
     case "delete {" => Delete
   }
 
-  private def extractPath(routeDef: String): (Seq[String], Seq[PathParameter]) = {
+  private def extractPath(routeDef: String, pathSegments: Seq[PathSegment]): (Seq[String], Seq[PathParameter]) = {
     val keyword = "pathPrefix("
     val start = routeDef.indexOf(keyword) + keyword.length
     val finish = routeDef.indexOf("\n")
@@ -95,7 +99,7 @@ object ServerDocumentation {
     val path = segment.substring(0, segment.indexOf(")")).split("/").map(_.trim).toSeq
     if(segment.endsWith("=>")) {
       val pathParameters = extractPathParameters(path, segment)
-      val integratedPath = integratePathWithParameters(path, pathParameters)
+      val integratedPath = integratePathWithSegments(integratePathWithParameters(path, pathParameters), pathSegments)
       (integratedPath, pathParameters)
     } else (path, Nil)
   }
@@ -143,9 +147,16 @@ object ServerDocumentation {
       case Nil => path
       case _ => path match {
         case Nil => Nil
-        case head :: tail if isParameterType(head) => Seq(pathParameters.head.name) ++ integratePathWithParameters(tail, pathParameters.tail)
+        case treasure if isParameterType(treasure.head) => Seq(s"{${pathParameters.head.name}}") ++ integratePathWithParameters(treasure.tail, pathParameters.tail)
         case other => Seq(other.head) ++ integratePathWithParameters(other.tail, pathParameters)
       }
+    }
+  }
+
+  private def integratePathWithSegments(path: Seq[String], segments: Seq[PathSegment]): Seq[String] = {
+    val segmentMap = segments.map { segment => (segment.name, segment.value) }.toMap
+    path.foldLeft(Seq.empty[String]) { (list, segmentName) =>
+      list ++ Seq(segmentMap.getOrElse(segmentName, segmentName))
     }
   }
 
