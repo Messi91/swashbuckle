@@ -92,6 +92,28 @@ object ServerDocumentation {
   }
 
   private def extractPath(routeDef: String, pathSegments: Seq[PathSegment]): (Seq[String], Seq[PathParameter]) = {
+    def isParameterType(pathSegment: String): Boolean = {
+      getParameterType(pathSegment).nonEmpty
+    }
+
+    def integratePathWithParameters(path: Seq[String], pathParameters: Seq[PathParameter]): Seq[String] = {
+      pathParameters match {
+        case Nil => path
+        case _ => path match {
+          case Nil => Nil
+          case treasure if isParameterType(treasure.head) => Seq(s"{${pathParameters.head.name}}") ++ integratePathWithParameters(treasure.tail, pathParameters.tail)
+          case other => Seq(other.head) ++ integratePathWithParameters(other.tail, pathParameters)
+        }
+      }
+    }
+
+    def integratePathWithSegments(path: Seq[String], segments: Seq[PathSegment]): Seq[String] = {
+      val segmentMap = segments.map { segment => (segment.name, segment.value) }.toMap
+      path.foldLeft(Seq.empty[String]) { (list, segmentName) =>
+        list ++ Seq(segmentMap.getOrElse(segmentName, segmentName))
+      }
+    }
+
     val keyword = "pathPrefix("
     val start = routeDef.indexOf(keyword) + keyword.length
     val finish = routeDef.indexOf("\n")
@@ -136,28 +158,6 @@ object ServerDocumentation {
       } else pathSegment
     }
     Try(ParameterTypes.withName(parameterType)).toOption
-  }
-
-  private def isParameterType(pathSegment: String): Boolean = {
-    getParameterType(pathSegment).nonEmpty
-  }
-
-  private def integratePathWithParameters(path: Seq[String], pathParameters: Seq[PathParameter]): Seq[String] = {
-    pathParameters match {
-      case Nil => path
-      case _ => path match {
-        case Nil => Nil
-        case treasure if isParameterType(treasure.head) => Seq(s"{${pathParameters.head.name}}") ++ integratePathWithParameters(treasure.tail, pathParameters.tail)
-        case other => Seq(other.head) ++ integratePathWithParameters(other.tail, pathParameters)
-      }
-    }
-  }
-
-  private def integratePathWithSegments(path: Seq[String], segments: Seq[PathSegment]): Seq[String] = {
-    val segmentMap = segments.map { segment => (segment.name, segment.value) }.toMap
-    path.foldLeft(Seq.empty[String]) { (list, segmentName) =>
-      list ++ Seq(segmentMap.getOrElse(segmentName, segmentName))
-    }
   }
 
   private def extractQueryParameters(methodDef: String): Seq[Parameter] = {
