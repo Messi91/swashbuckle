@@ -52,14 +52,14 @@ object ServerDocumentation {
     code.collect {
       case q"..$mods val ..$name = $routeDef" if isRouteDef(routeDef) =>
         val routeName = name.head.toString
-        val path = extractPath(routeDef.toString)
+        val (path, pathParameters) = extractPath(routeDef.toString)
         val methodDefs = extractMethodDefs(routeDef.toString)
         methodDefs.map { methodDef =>
           RouteDef(
             name = routeName,
             method = methodDef.method,
             path = path,
-            parameters = extractParameters(methodDef.body),
+            parameters = pathParameters ++ extractQueryParameters(methodDef.body),
             responses = Nil
           )
         }
@@ -84,20 +84,32 @@ object ServerDocumentation {
     case "delete {" => Delete
   }
 
-  private def extractPath(routeDef: String): Seq[String] = {
+  private def extractPath(routeDef: String): (Seq[String], Seq[PathParameter]) = {
     val keyword = "pathPrefix("
     val start = routeDef.indexOf(keyword) + keyword.length
-    val finish = routeDef.indexOf(")")
-    routeDef.substring(start, finish).split("/").map(_.trim)
+    val finish = routeDef.indexOf("\n")
+    val segment = routeDef.substring(start, finish).trim
+    val path = segment.substring(0, segment.indexOf(")")).split("/").map(_.trim)
+
+    if(segment.endsWith("=>")) {
+      (path, extractPathParameters(segment))
+    }
+    else (path, Nil)
   }
 
-  private def extractParameters(methodDef: String): Seq[Parameter] = {
+  private def extractPathParameters(pathDef: String): Seq[PathParameter] = {
+    val start = pathDef.indexOf("{")
+    val finish = pathDef.indexOf("=>")
+
+  }
+
+  private def extractQueryParameters(methodDef: String): Seq[Parameter] = {
     val keyword = "parameters("
     if (methodDef.contains(keyword)) {
       val start = methodDef.indexOf(keyword) + keyword.length
       val finish = methodDef.indexOf(")")
-      val parameters = methodDef.substring(start, finish).split(",").map(word => word.trim)
-      parameters.map { parameter =>
+      val queryParameters = methodDef.substring(start, finish).split(",").map(word => word.trim)
+      queryParameters.map { parameter =>
         val Array(name, typeName) = parameter.split(".as\\(")
         val required = !parameter.endsWith("?")
         val trimmedType = typeName.split("\\)").head
