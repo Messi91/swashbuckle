@@ -118,10 +118,10 @@ object ServerDocumentation {
     val start = routeDef.indexOf(keyword) + keyword.length
     val finish = routeDef.indexOf("\n")
     val segment = routeDef.substring(start, finish).trim
-    val path = segment.substring(0, segment.indexOf(")")).split("/").map(_.trim).toSeq
+    val path = integratePathWithSegments(segment.substring(0, segment.indexOf(")")).split("/").map(_.trim).toSeq, pathSegments)
     if(segment.endsWith("=>")) {
       val pathParameters = extractPathParameters(path, segment)
-      val integratedPath = integratePathWithSegments(integratePathWithParameters(path, pathParameters), pathSegments)
+      val integratedPath = integratePathWithParameters(path, pathParameters)
       (integratedPath, pathParameters)
     } else (path, Nil)
   }
