@@ -1,9 +1,8 @@
 package com.swashbuckle.documentation
 
+import com.swashbuckle.components.Components.PathParameterTypes.PathParameterType
+import com.swashbuckle.components.Components.QueryParameterTypes.QueryParameterType
 import com.swashbuckle.components.Components._
-import com.swashbuckle.components.Fields._
-import com.swashbuckle.components.ParameterTypes
-import com.swashbuckle.components.ParameterTypes.ParameterType
 
 import scala.meta._
 import scala.util.Try
@@ -93,7 +92,7 @@ object ServerDocumentation {
 
   private def extractPath(routeDef: String, pathSegments: Seq[PathSegment]): (Seq[String], Seq[PathParameter]) = {
     def isParameterType(pathSegment: String): Boolean = {
-      getParameterType(pathSegment).nonEmpty
+      getPathParameterType(pathSegment).nonEmpty
     }
 
     def integratePathWithParameters(path: Seq[String], pathParameters: Seq[PathParameter]): Seq[String] = {
@@ -140,18 +139,22 @@ object ServerDocumentation {
       }
       else Seq(segment)
     }
-    val parameterTypes: Seq[ParameterType] = path.flatMap(getParameterType)
-    val pairSequence: Seq[(String, ParameterType)] = parameterNames.zip(parameterTypes)
-    pairSequence.map { case (name, typeName) => PathParameter(name, typeName.toString) }
+    val parameterTypes: Seq[PathParameterType] = path.flatMap(getPathParameterType)
+    val pairSequence: Seq[(String, PathParameterType)] = parameterNames.zip(parameterTypes)
+    pairSequence.map { case (name, typeName) => PathParameter(name, typeName) }
   }
 
-  private def getParameterType(pathSegment: String): Option[ParameterType] = {
+  private def getPathParameterType(pathSegment: String): Option[PathParameterType] = {
     val parameterType = {
       if (pathSegment.startsWith("PathMatchers.")) {
         pathSegment.split("\\.")(1)
       } else pathSegment
     }
-    Try(ParameterTypes.withName(parameterType)).toOption
+    Try(PathParameterTypes.withName(parameterType)).toOption
+  }
+
+  private def getQueryParameterType(parameterType: String): Option[QueryParameterType] = {
+    Try(QueryParameterTypes.withName(parameterType)).toOption
   }
 
   private def extractQueryParameters(methodDef: String): Seq[Parameter] = {
@@ -169,14 +172,14 @@ object ServerDocumentation {
           val innerType = trimmedType.substring(trimmedType.indexOf("[") + 1, trimmedType.indexOf("]"))
           ArrayQueryParameter(
             name = name.drop(1),
-            `type` = innerType,
+            `type` = getQueryParameterType(innerType).get,
             collectionFormat = collectionType,
             required = required
           )
         } else {
           QueryParameter(
             name = name.drop(1),
-            `type` = trimmedType,
+            `type` = getQueryParameterType(trimmedType).get,
             required = required
           )
         }

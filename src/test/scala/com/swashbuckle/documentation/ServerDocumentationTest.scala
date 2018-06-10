@@ -2,8 +2,9 @@ package com.swashbuckle.documentation
 
 import java.io.File
 
-import com.swashbuckle.components.Components.RouteDef
-import com.swashbuckle.components.Fields._
+import com.swashbuckle.components.Components._
+import com.swashbuckle.components.Components.PathParameterTypes._
+import com.swashbuckle.components.Components.QueryParameterTypes._
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.meta._
@@ -32,7 +33,7 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
-          `type` = "long"
+          `type` = LongNumber
         ) :: BodyParameter(
           name = "update",
           schema = "com.swashbuckle.service.Message"
@@ -51,14 +52,14 @@ class ServerDocumentationTest extends FunSpec with Matchers {
           name = "ids",
           required = false,
           collectionFormat = "csv",
-          `type` = "long"
+          `type` = LongType
         ) :: QueryParameter(
           name = "type",
-          `type` = "string",
+          `type` = StringType,
           required = false
         ) :: QueryParameter(
           name = "isPositive",
-          `type` = "boolean",
+          `type` = BooleanType,
           required = false
         ) :: Nil,
         responses = Response(
@@ -73,7 +74,7 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
-          `type` = "long"
+          `type` = LongNumber
         ) :: Nil,
         responses = Response(
           status = 200,
@@ -87,7 +88,7 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
-          `type` = "long"
+          `type` = LongNumber
         ) :: Nil,
         responses = Response(
           status = 200,
