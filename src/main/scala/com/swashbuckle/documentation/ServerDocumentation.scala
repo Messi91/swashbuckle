@@ -12,7 +12,7 @@ object ServerDocumentation {
     val (packageName, code) = extractCode(source)
     val imports = extractImports(code)
     val traitBody = extractTraitBody(code)
-    val pathSegments = extractSegments(traitBody)
+    val pathSegments = extractPathSegments(traitBody)
     extractRouteDefs(traitBody, pathSegments)
   }
 
@@ -36,13 +36,9 @@ object ServerDocumentation {
     }.flatten
   }
 
-  private def extractSegments(code: Seq[Stat]): Seq[PathSegment] = {
+  private def extractPathSegments(code: Seq[Stat]): Seq[PathSegment] = {
     def inQuotes(value: Term): Boolean = {
       value.toString.startsWith("\"") && value.toString.endsWith("\"")
-    }
-
-    def sanitizeString(str: String) = {
-      str.replaceAll("\"", "")
     }
 
     code.collect {
@@ -121,8 +117,8 @@ object ServerDocumentation {
     if(segment.endsWith("=>")) {
       val pathParameters = extractPathParameters(path, segment)
       val integratedPath = integratePathWithParameters(path, pathParameters)
-      (integratedPath, pathParameters)
-    } else (path, Nil)
+      (sanitize(integratedPath), pathParameters)
+    } else (sanitize(path), Nil)
   }
 
   private def extractPathParameters(path: Seq[String], pathDef: String): Seq[PathParameter] = {
@@ -185,5 +181,13 @@ object ServerDocumentation {
         }
       }
     } else Nil
+  }
+
+  private def sanitizeString(str: String): String = {
+    str.replaceAll("\"", "")
+  }
+
+  private def sanitize(pathParameters: Seq[String]): Seq[String] = {
+    pathParameters.map(sanitizeString)
   }
 }

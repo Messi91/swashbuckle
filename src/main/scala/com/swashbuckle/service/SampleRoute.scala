@@ -7,8 +7,6 @@ import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers.CsvSeq
 import fommil.sjs.FamilyFormats
 import spray.json._
 
-import scala.concurrent.Future
-
 trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProtocol with FamilyFormats {
   private val pathSegment = "path"
   private val toPathSegment = "to"
@@ -16,7 +14,7 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
 
   val service = new SampleService
 
-  private val createMessageRoute = pathPrefix(pathSegment / toPathSegment / messagesPathSegment) {
+  private val createMessageRoute = pathPrefix(pathSegment / "to" / messagesPathSegment) {
     pathEndOrSingleSlash {
       post {
         entity(as[Message]) { message =>
@@ -28,7 +26,7 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
     }
   }
 
-  private val updateMessageRoute = pathPrefix(pathSegment / toPathSegment / PathMatchers.JavaUUID / messagesPathSegment / PathMatchers.LongNumber) { case (uuid, id) =>
+  private val updateMessageRoute = pathPrefix("path" / toPathSegment / PathMatchers.JavaUUID / messagesPathSegment / PathMatchers.LongNumber) { case (uuid, id) =>
     pathEndOrSingleSlash {
       put {
         entity(as[Message]) { update =>
@@ -40,7 +38,7 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
     }
   }
 
-  private val getMessagesRoute = pathPrefix(pathSegment / toPathSegment / messagesPathSegment) {
+  private val getMessagesRoute = pathPrefix(pathSegment / toPathSegment / "messages") {
     pathEndOrSingleSlash {
       get {
         parameters('ids.as(CsvSeq[Long]).?, 'type.as[String].?, 'isPositive.as[Boolean].?) { (_, _, _) =>
@@ -52,7 +50,7 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
     }
   }
 
-  private val getMessageRoute = pathPrefix(pathSegment / toPathSegment / messagesPathSegment / PathMatchers.LongNumber) { id =>
+  private val getMessageRoute = pathPrefix("path" / toPathSegment / messagesPathSegment / PathMatchers.LongNumber) { id =>
     pathEndOrSingleSlash {
       get {
         onSuccess(service.getMessage(id)) { response =>
@@ -62,7 +60,7 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
     }
   }
 
-  private val deleteMessageRoute = pathPrefix(pathSegment / toPathSegment / messagesPathSegment / PathMatchers.LongNumber) { id =>
+  private val deleteMessageRoute = pathPrefix(pathSegment / "to" / messagesPathSegment / PathMatchers.LongNumber) { id =>
     pathEndOrSingleSlash {
       delete {
         onSuccess(service.deleteMessage(id)) { response =>
@@ -77,16 +75,4 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
     getMessagesRoute ~
     getMessageRoute ~
     deleteMessageRoute
-}
-
-class SampleService {
-  def createMessage(message: Message): Future[Message] = Future.successful(message)
-
-  def updateMessage(uuid: Long, message: Message): Future[Message] = Future.successful(message)
-
-  def getMessages: Future[Seq[Message]] = Future.successful(Message.example :: Message.example :: Nil)
-
-  def getMessage(uuid: Long): Future[Option[Message]] = Future.successful(Some(Message.example))
-
-  def deleteMessage(uuid: Long): Future[Boolean] = Future.successful(true)
 }
