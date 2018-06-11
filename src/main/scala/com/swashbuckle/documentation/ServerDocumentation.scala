@@ -61,7 +61,7 @@ object ServerDocumentation {
             name = routeName,
             method = methodDef.method,
             path = path,
-            parameters = pathParameters ++ extractQueryParameters(methodDef.body),
+            parameters = pathParameters ++ extractQueryParameters(methodDef.body) ++ extractBodyParameter(methodDef.body),
             responses = Nil
           )
         }
@@ -77,6 +77,21 @@ object ServerDocumentation {
         val method = getMethodType(methodStart)
         MethodDef(method = method, body = body)
     }
+  }
+
+  private def extractBodyParameter(methodDef: String): Option[BodyParameter] = {
+    val keyword = "entity(as["
+    if (methodDef.contains(keyword)) {
+      val start = methodDef.indexOf(keyword) + keyword.length
+      val finish = methodDef.indexOf("=>")
+      val segment = methodDef.substring(start, finish)
+      val typeFinish = segment.indexOf("])")
+      val nameStart = segment.indexOf("{") + 1
+      val typeName = segment.substring(0, typeFinish).trim
+      val name = segment.substring(nameStart).trim
+      Some(BodyParameter(name = name, schema = typeName))
+    }
+    else None
   }
 
   private def getMethodType(str: String): Method = str match {
