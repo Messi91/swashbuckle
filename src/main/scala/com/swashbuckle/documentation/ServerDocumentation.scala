@@ -175,6 +175,15 @@ object ServerDocumentation {
     }
 
     def extractResponse(methodDef: String, objects: Seq[String]): Option[Response] = {
+      def findSchema(code: Seq[Stat]): Option[DefinitionFields] = {
+        code.collect {
+          case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == schemaName =>
+            paramss.flatten.map { param =>
+              (param.name.value, param.decltpe.map(_.toString).getOrElse(""))
+            }
+        }.headOption
+      }
+
       val keyword = "onSuccess("
       if (methodDef.contains(keyword)) {
         val start = methodDef.indexOf(keyword) + keyword.length
@@ -184,6 +193,7 @@ object ServerDocumentation {
         val Array(serviceObj, functionSegment) = serviceCall.split("\\.")
         objects.find(_ == serviceObj).map { service =>
           val functionName = if (functionSegment.contains("(")) functionSegment.split("(")(0) else functionSegment
+
         }
       } else None
     }
