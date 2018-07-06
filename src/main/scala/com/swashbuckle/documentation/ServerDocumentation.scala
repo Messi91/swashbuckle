@@ -1,5 +1,7 @@
 package com.swashbuckle.documentation
 
+import java.io.File
+
 import com.swashbuckle.components.Components.PathParameterTypes.PathParameterType
 import com.swashbuckle.components.Components.QueryParameterTypes.QueryParameterType
 import com.swashbuckle.components.Components._
@@ -8,12 +10,21 @@ import scala.meta._
 import scala.util.Try
 
 object ServerDocumentation {
-  def apply(source: Source): Seq[RouteDef] = {
+
+  private val rootDir = "src/main/scala/"
+
+  def apply(source: Source): Seq[SchemaDefinition] = {
     val (packageName, code) = extractCode(source)
     val imports = extractImports(code)
     val traitBody = extractTraitBody(code)
     val pathSegments = extractPathSegments(traitBody)
-    extractRouteDefs(traitBody, pathSegments)
+    val routeDefs = extractRouteDefs(traitBody, pathSegments)
+    val schemaDefinitions = routeDefs.collect {
+      case RouteDef(_, _, _, parameters, _) => parameters.collect {
+        case BodyParameter(_, schema) => extractSchemaDefinition(schema, code, packageName, imports)
+      }.flatten
+    }.flatten
+    schemaDefinitions
   }
 
   private def extractCode(source: Source): (String, Seq[Stat]) = source match {
@@ -46,9 +57,100 @@ object ServerDocumentation {
     }
   }
 
+  private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Option[SchemaDefinition] = {
+    def getSourceFiles(paths: Seq[String]): Seq[File] = {
+      paths.map(new File(_)).filter(_ != null).flatMap { directory =>
+        Try(directory.listFiles.filter(_.isFile)).toOption.toSeq.flatMap(_.toSeq)
+      }
+    }
+
+    def findDefinition(code: Seq[Stat]): Option[SchemaDefinition] = {
+      code.collect {
+        case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == schemaName =>
+          paramss.flatten.map { param =>
+            (param.name.value, param.decltpe.map(_.toString).getOrElse(""))
+          }
+      }.headOption
+    }
+
+    def searchPackages: Option[SchemaDefinition] = {
+      val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
+      val sources = getSourceFiles(paths).map(_.parse[Source].get)
+      val code = sources.map(extractCode).map(_._2)
+      code.map(findDefinition).collect {
+        case Some(schemaDefinition) => schemaDefinition
+      }.headOption
+    }
+
+    def searchCurrentSource: Option[SchemaDefinition] = {
+      findDefinition(currentSource)
+    }
+
+    searchCurrentSource match {
+      case definition @ Some(_) => definition
+      case None => searchPackages
+    }
+  }
+
   private def extractRouteDefs(code: Seq[Stat], pathSegments: Seq[PathSegment]): Seq[RouteDef] = {
     def isRouteDef(routeDef: Term): Boolean = {
       routeDef.toString.startsWith("path(") || routeDef.toString.startsWith("pathPrefix(")
+    }
+
+    def extractMethodDefs(routeDef: String): Seq[MethodDef] = {
+      "get {" :: "post {" :: "put {" :: "delete {" :: Nil collect {
+        case methodStart if routeDef.contains(methodStart) =>
+          val start = routeDef.indexOf(methodStart)
+          val finish = routeDef.indexOf("}")
+          val body = routeDef.substring(start, finish)
+          val method = getMethodType(methodStart)
+          MethodDef(method = method, body = body)
+      }
+    }
+
+    def extractQueryParameters(methodDef: String): Seq[Parameter] = {
+      val keyword = "parameters("
+      if (methodDef.contains(keyword)) {
+        val start = methodDef.indexOf(keyword) + keyword.length
+        val finish = methodDef.indexOf(")")
+        val queryParameters = methodDef.substring(start, finish).split(",").map(word => word.trim).toSeq
+        queryParameters.map { parameter =>
+          val Array(name, typeName) = parameter.split(".as\\(")
+          val required = !parameter.endsWith("?")
+          val trimmedType = typeName.split("\\)").head
+          if (trimmedType.contains("[")) {
+            val collectionType = trimmedType.split("\\[").head
+            val innerType = trimmedType.substring(trimmedType.indexOf("[") + 1, trimmedType.indexOf("]"))
+            ArrayQueryParameter(
+              name = name.drop(1),
+              `type` = getQueryParameterType(innerType).get,
+              collectionFormat = collectionType,
+              required = required
+            )
+          } else {
+            QueryParameter(
+              name = name.drop(1),
+              `type` = getQueryParameterType(trimmedType).get,
+              required = required
+            )
+          }
+        }
+      } else Nil
+    }
+
+   def extractBodyParameter(methodDef: String): Option[BodyParameter] = {
+      val keyword = "entity(as["
+      if (methodDef.contains(keyword)) {
+        val start = methodDef.indexOf(keyword) + keyword.length
+        val finish = methodDef.indexOf("=>")
+        val segment = methodDef.substring(start, finish)
+        val typeFinish = segment.indexOf("])")
+        val nameStart = segment.indexOf("{") + 1
+        val typeName = segment.substring(0, typeFinish).trim
+        val name = segment.substring(nameStart).trim
+        Some(BodyParameter(name = name, schema = typeName))
+      }
+      else None
     }
 
     code.collect {
@@ -66,32 +168,6 @@ object ServerDocumentation {
           )
         }
     }.flatten
-  }
-
-  private def extractMethodDefs(routeDef: String): Seq[MethodDef] = {
-    "get {" :: "post {" :: "put {" :: "delete {" :: Nil collect {
-      case methodStart if routeDef.contains(methodStart) =>
-        val start = routeDef.indexOf(methodStart)
-        val finish = routeDef.indexOf("}")
-        val body = routeDef.substring(start, finish)
-        val method = getMethodType(methodStart)
-        MethodDef(method = method, body = body)
-    }
-  }
-
-  private def extractBodyParameter(methodDef: String): Option[BodyParameter] = {
-    val keyword = "entity(as["
-    if (methodDef.contains(keyword)) {
-      val start = methodDef.indexOf(keyword) + keyword.length
-      val finish = methodDef.indexOf("=>")
-      val segment = methodDef.substring(start, finish)
-      val typeFinish = segment.indexOf("])")
-      val nameStart = segment.indexOf("{") + 1
-      val typeName = segment.substring(0, typeFinish).trim
-      val name = segment.substring(nameStart).trim
-      Some(BodyParameter(name = name, schema = typeName))
-    }
-    else None
   }
 
   private def getMethodType(str: String): Method = str match {
@@ -124,6 +200,25 @@ object ServerDocumentation {
       }
     }
 
+    def extractPathParameters(path: Seq[String], pathDef: String): Seq[PathParameter] = {
+      val start = pathDef.indexOf("{") + 1
+      val finish = pathDef.indexOf("=>")
+      val segment = pathDef.substring(start, finish).trim
+      val parameterNames: Seq[String] = {
+        if (segment == "_") Seq("?")
+        else if (segment.startsWith("case") || segment.startsWith("(")) {
+          val innerStart = segment.indexOf("(") + 1
+          val innerFinish = segment.lastIndexOf(")")
+          val innerSegment = segment.substring(innerStart, innerFinish)
+          innerSegment.split(",").map(_.trim).toSeq
+        }
+        else Seq(segment)
+      }
+      val parameterTypes: Seq[PathParameterType] = path.flatMap(getPathParameterType)
+      val pairSequence: Seq[(String, PathParameterType)] = parameterNames.zip(parameterTypes)
+      pairSequence.map { case (name, typeName) => PathParameter(name, typeName) }
+    }
+
     val keyword = "pathPrefix("
     val start = routeDef.indexOf(keyword) + keyword.length
     val finish = routeDef.indexOf("\n")
@@ -134,25 +229,6 @@ object ServerDocumentation {
       val integratedPath = integratePathWithParameters(path, pathParameters)
       (sanitize(integratedPath), pathParameters)
     } else (sanitize(path), Nil)
-  }
-
-  private def extractPathParameters(path: Seq[String], pathDef: String): Seq[PathParameter] = {
-    val start = pathDef.indexOf("{") + 1
-    val finish = pathDef.indexOf("=>")
-    val segment = pathDef.substring(start, finish).trim
-    val parameterNames: Seq[String] = {
-      if (segment == "_") Seq("?")
-      else if (segment.startsWith("case") || segment.startsWith("(")) {
-        val innerStart = segment.indexOf("(") + 1
-        val innerFinish = segment.lastIndexOf(")")
-        val innerSegment = segment.substring(innerStart, innerFinish)
-        innerSegment.split(",").map(_.trim).toSeq
-      }
-      else Seq(segment)
-    }
-    val parameterTypes: Seq[PathParameterType] = path.flatMap(getPathParameterType)
-    val pairSequence: Seq[(String, PathParameterType)] = parameterNames.zip(parameterTypes)
-    pairSequence.map { case (name, typeName) => PathParameter(name, typeName) }
   }
 
   private def getPathParameterType(pathSegment: String): Option[PathParameterType] = {
@@ -166,36 +242,6 @@ object ServerDocumentation {
 
   private def getQueryParameterType(parameterType: String): Option[QueryParameterType] = {
     Try(QueryParameterTypes.withName(parameterType)).toOption
-  }
-
-  private def extractQueryParameters(methodDef: String): Seq[Parameter] = {
-    val keyword = "parameters("
-    if (methodDef.contains(keyword)) {
-      val start = methodDef.indexOf(keyword) + keyword.length
-      val finish = methodDef.indexOf(")")
-      val queryParameters = methodDef.substring(start, finish).split(",").map(word => word.trim).toSeq
-      queryParameters.map { parameter =>
-        val Array(name, typeName) = parameter.split(".as\\(")
-        val required = !parameter.endsWith("?")
-        val trimmedType = typeName.split("\\)").head
-        if (trimmedType.contains("[")) {
-          val collectionType = trimmedType.split("\\[").head
-          val innerType = trimmedType.substring(trimmedType.indexOf("[") + 1, trimmedType.indexOf("]"))
-          ArrayQueryParameter(
-            name = name.drop(1),
-            `type` = getQueryParameterType(innerType).get,
-            collectionFormat = collectionType,
-            required = required
-          )
-        } else {
-          QueryParameter(
-            name = name.drop(1),
-            `type` = getQueryParameterType(trimmedType).get,
-            required = required
-          )
-        }
-      }
-    } else Nil
   }
 
   private def sanitizeString(str: String): String = {

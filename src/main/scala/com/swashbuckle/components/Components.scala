@@ -5,6 +5,8 @@ import com.swashbuckle.components.Components.QueryParameterTypes.QueryParameterT
 
 object Components {
 
+  type SchemaDefinition = Seq[(String, String)]
+
   sealed trait Method
 
   case object Get extends Method
@@ -26,7 +28,6 @@ object Components {
 
   case class BodyParameter(name: String, schema: String) extends Parameter
 
-
   case class Response(status: Int, schema: String)
 
 
@@ -45,7 +46,7 @@ object Components {
     responses: Seq[Response]
   )
 
-  // case class ServerDocumentation()
+  case class ServerDocumentation()
 
   object PathParameterTypes extends Enumeration {
 
