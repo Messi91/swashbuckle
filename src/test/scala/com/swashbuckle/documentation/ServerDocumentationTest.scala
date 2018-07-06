@@ -22,8 +22,10 @@ class ServerDocumentationTest extends FunSpec with Matchers {
           schema = "com.swashbuckle.service.Message"
         ) :: Nil,
         responses = Response(
-          status = 200,
-          schema = "com.swashbuckle.service.Message"
+          status = 201,
+          message = None,
+          schema = Some("com.swashbuckle.service.Message"),
+          isArray = false
         ) :: Nil
       )
 
@@ -40,7 +42,14 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil,
         responses = Response(
           status = 200,
-          schema = "com.swashbuckle.service.Message"
+          message = None,
+          schema = Some("com.swashbuckle.service.Message"),
+          isArray = false
+        ) :: Response(
+          status = 404,
+          message = Some("Message not found"),
+          schema = Some("com.swashbuckle.service.Message"),
+          isArray = false
         ) :: Nil
       )
 
@@ -64,7 +73,9 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil,
         responses = Response(
           status = 200,
-          schema = "Seq[com.swashbuckle.service.Message]"
+          message = None,
+          schema = Some("Seq[com.swashbuckle.service.Message]"),
+          isArray = true
         ) :: Nil
       )
 
@@ -78,7 +89,9 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil,
         responses = Response(
           status = 200,
-          schema = "com.swashbuckle.service.Message"
+          message = None,
+          schema = Some("com.swashbuckle.service.Message"),
+          isArray = false
         ) :: Nil
       )
 
@@ -92,7 +105,9 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil,
         responses = Response(
           status = 200,
-          schema = ""
+          message = None,
+          schema = None,
+          isArray = false
         ) :: Nil
       )
 
@@ -100,7 +115,7 @@ class ServerDocumentationTest extends FunSpec with Matchers {
 
       val source = new File("src/main/scala/com/swashbuckle/service/SampleRoute.scala").parse[Source].get
 
-      //expected shouldBe RoutesDocumentation(source)
+      //expected shouldBe ServerDocumentation(source)
 
       println(ServerDocumentation(source))
     }

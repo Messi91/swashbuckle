@@ -13,11 +13,12 @@ object ServerDocumentation {
 
   private val rootDir = "src/main/scala/"
 
-  def apply(source: Source): Seq[SchemaDefinition] = {
+  def apply(source: Source): Seq[Definition] = {
     val (packageName, code) = extractCode(source)
     val imports = extractImports(code)
     val traitBody = extractTraitBody(code)
     val pathSegments = extractPathSegments(traitBody)
+    val objects = extractObjectDefinitions(traitBody)
     val routeDefs = extractRouteDefs(traitBody, pathSegments)
     val schemaDefinitions = routeDefs.collect {
       case RouteDef(_, _, _, parameters, _) => parameters.collect {
@@ -48,24 +49,34 @@ object ServerDocumentation {
     }.flatten
   }
 
-  private def extractPathSegments(code: Seq[Stat]): Seq[PathSegment] = {
+  private def extractPathSegments(code: Seq[Stat]): Seq[Field] = {
     def inQuotes(value: Term): Boolean = {
       value.toString.startsWith("\"") && value.toString.endsWith("\"")
     }
 
     code.collect {
-      case q"..$mods val ..$name = $value" if inQuotes(value) => PathSegment(name.head.toString, sanitizeString(value.toString))
+      case q"..$mods val ..$name = $value" if inQuotes(value) => Field(name.head.toString, sanitizeString(value.toString))
     }
   }
 
-  private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[SchemaDefinition] = {
+  private def extractObjectDefinitions(code: Seq[Stat]): Seq[Field] = {
+    def isObject(value: Term): Boolean = {
+      value.toString.startsWith("new ")
+    }
+
+    code.collect {
+      case q"..$mods val ..$name = $value" if isObject(value) => Field(name.head.toString, value.toString.split(" ")(1))
+    }
+  }
+
+  private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[Definition] = {
     def getSourceFiles(paths: Seq[String]): Seq[File] = {
       paths.map(new File(_)).filter(_ != null).flatMap { directory =>
         Try(directory.listFiles.filter(_.isFile)).toOption.toSeq.flatMap(_.toSeq)
       }
     }
 
-    def findSchema(code: Seq[Stat]): Option[Schema] = {
+    def findSchema(code: Seq[Stat]): Option[DefinitionFields] = {
       code.collect {
         case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == schemaName =>
           paramss.flatten.map { param =>
@@ -74,22 +85,22 @@ object ServerDocumentation {
       }.headOption
     }
 
-    def searchPackages: Option[SchemaDefinition] = {
+    def searchPackages: Option[Definition] = {
       val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
       val sources = getSourceFiles(paths).map(_.parse[Source].get)
       val code = sources.map(extractCode).map(_._2)
       code.map(findSchema).collect {
-        case Some(schema) => SchemaDefinition(schemaName, schema)
+        case Some(schema) => Definition(schemaName, schema)
       }.headOption
     }
 
-    def searchCurrentSource: Option[Schema] = {
+    def searchCurrentSource: Option[DefinitionFields] = {
       findSchema(currentSource)
     }
 
-    def findDefinition: Option[SchemaDefinition] = {
+    def findDefinition: Option[Definition] = {
       searchCurrentSource match {
-        case definition @ Some(_) => definition.map(SchemaDefinition(schemaName, _))
+        case definition @ Some(_) => definition.map(Definition(schemaName, _))
         case None => searchPackages
       }
     }
@@ -103,7 +114,7 @@ object ServerDocumentation {
     surfaceDefinitions ++ nonPrimitiveTypes.flatMap(extractSchemaDefinition(_, currentSource, currentPackage, imports))
   }
 
-  private def extractRouteDefs(code: Seq[Stat], pathSegments: Seq[PathSegment]): Seq[RouteDef] = {
+  private def extractRouteDefs(code: Seq[Stat], pathSegments: Seq[Field]): Seq[RouteDef] = {
     def isRouteDef(routeDef: Term): Boolean = {
       routeDef.toString.startsWith("path(") || routeDef.toString.startsWith("pathPrefix(")
     }
@@ -149,7 +160,7 @@ object ServerDocumentation {
       } else Nil
     }
 
-   def extractBodyParameter(methodDef: String): Option[BodyParameter] = {
+    def extractBodyParameter(methodDef: String): Option[BodyParameter] = {
       val keyword = "entity(as["
       if (methodDef.contains(keyword)) {
         val start = methodDef.indexOf(keyword) + keyword.length
@@ -160,8 +171,21 @@ object ServerDocumentation {
         val typeName = segment.substring(0, typeFinish).trim
         val name = segment.substring(nameStart).trim
         Some(BodyParameter(name = name, schema = typeName))
-      }
-      else None
+      } else None
+    }
+
+    def extractResponse(methodDef: String, objects: Seq[String]): Option[Response] = {
+      val keyword = "onSuccess("
+      if (methodDef.contains(keyword)) {
+        val start = methodDef.indexOf(keyword) + keyword.length
+        val finish = methodDef.indexOf("}")
+        val segment = methodDef.substring(start, finish)
+        val serviceCall = segment.substring(0, segment.indexOf(")"))
+        val Array(serviceObj, functionSegment) = serviceCall.split("\\.")
+        objects.find(_ == serviceObj).map { service =>
+          val functionName = if (functionSegment.contains("(")) functionSegment.split("(")(0) else functionSegment
+        }
+      } else None
     }
 
     code.collect {
@@ -188,7 +212,7 @@ object ServerDocumentation {
     case "delete {" => Delete
   }
 
-  private def extractPath(routeDef: String, pathSegments: Seq[PathSegment]): (Seq[String], Seq[PathParameter]) = {
+  private def extractPath(routeDef: String, pathSegments: Seq[Field]): (Seq[String], Seq[PathParameter]) = {
     def isParameterType(pathSegment: String): Boolean = {
       getPathParameterType(pathSegment).nonEmpty
     }
@@ -204,7 +228,7 @@ object ServerDocumentation {
       }
     }
 
-    def integratePathWithSegments(path: Seq[String], segments: Seq[PathSegment]): Seq[String] = {
+    def integratePathWithSegments(path: Seq[String], segments: Seq[Field]): Seq[String] = {
       val segmentMap = segments.map { segment => (segment.name, segment.value) }.toMap
       path.foldLeft(Seq.empty[String]) { (list, segmentName) =>
         list ++ Seq(segmentMap.getOrElse(segmentName, segmentName))

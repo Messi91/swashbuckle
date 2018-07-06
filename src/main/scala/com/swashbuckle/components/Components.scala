@@ -5,9 +5,9 @@ import com.swashbuckle.components.Components.QueryParameterTypes.QueryParameterT
 
 object Components {
 
-  type Schema = Seq[(String, String)]
+  type DefinitionFields = Seq[(String, String)]
 
-  case class SchemaDefinition(name: String, schema: Schema)
+  case class Definition(name: String, schema: DefinitionFields)
 
   sealed trait Method
 
@@ -30,10 +30,10 @@ object Components {
 
   case class BodyParameter(name: String, schema: String) extends Parameter
 
-  case class Response(status: Int, schema: String)
+  case class Response(status: Int, message: Option[String], schema: Option[String], isArray: Boolean)
 
 
-  case class PathSegment(name: String, value: String)
+  case class Field(name: String, value: String)
 
   case class MethodDef(
     method: Method,

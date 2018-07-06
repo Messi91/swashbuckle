@@ -19,7 +19,7 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
       post {
         entity(as[Message]) { message =>
           onSuccess(service.createMessage(message)) { response =>
-            complete(StatusCodes.OK, response)
+            complete(StatusCodes.Created, response)
           }
         }
       }
@@ -53,8 +53,9 @@ trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProto
   private val getMessageRoute = pathPrefix("path" / toPathSegment / messagesPathSegment / PathMatchers.LongNumber) { id =>
     pathEndOrSingleSlash {
       get {
-        onSuccess(service.getMessage(id)) { response =>
-          complete(StatusCodes.OK, response)
+        onSuccess(service.getMessage(id)) {
+          case Some(message) => complete(StatusCodes.OK, message)
+          case None => complete(StatusCodes.NotFound, "Message not found")
         }
       }
     }
