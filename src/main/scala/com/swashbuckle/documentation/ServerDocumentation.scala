@@ -21,9 +21,11 @@ object ServerDocumentation {
     val routeDefs = extractRouteDefs(traitBody, pathSegments)
     val schemaDefinitions = routeDefs.collect {
       case RouteDef(_, _, _, parameters, _) => parameters.collect {
-        case BodyParameter(_, schema) => extractSchemaDefinition(schema, code, packageName, imports)
+        case BodyParameter(_, schemaName) =>
+          extractSchemaDefinition(schemaName, code, packageName, imports)
+            .map(definition => SchemaDefinition(schemaName, definition))
       }.flatten
-    }.flatten
+    }.flatten.distinct
     schemaDefinitions
   }
 
@@ -57,39 +59,47 @@ object ServerDocumentation {
     }
   }
 
-  private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Option[SchemaDefinition] = {
+  private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[Schema] = {
     def getSourceFiles(paths: Seq[String]): Seq[File] = {
       paths.map(new File(_)).filter(_ != null).flatMap { directory =>
         Try(directory.listFiles.filter(_.isFile)).toOption.toSeq.flatMap(_.toSeq)
       }
     }
 
-    def findDefinition(code: Seq[Stat]): Option[SchemaDefinition] = {
+    def findSchema(name: String, code: Seq[Stat]): Option[Schema] = {
       code.collect {
-        case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == schemaName =>
+        case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == name =>
           paramss.flatten.map { param =>
             (param.name.value, param.decltpe.map(_.toString).getOrElse(""))
           }
       }.headOption
     }
 
-    def searchPackages: Option[SchemaDefinition] = {
+    def searchPackages(name: String): Option[Schema] = {
       val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
       val sources = getSourceFiles(paths).map(_.parse[Source].get)
       val code = sources.map(extractCode).map(_._2)
-      code.map(findDefinition).collect {
+      code.map(findSchema(name, _)).collect {
         case Some(schemaDefinition) => schemaDefinition
       }.headOption
     }
 
-    def searchCurrentSource: Option[SchemaDefinition] = {
-      findDefinition(currentSource)
+    def searchCurrentSource(name: String): Option[Schema] = {
+      findSchema(name, currentSource)
     }
 
-    searchCurrentSource match {
-      case definition @ Some(_) => definition
-      case None => searchPackages
+    def findDefinition(name: String) = {
+      searchCurrentSource(name) match {
+        case definition @ Some(_) => definition
+        case None => searchPackages(name)
+      }
     }
+
+    val surfaceDefinitions = findDefinition(schemaName).getOrElse(Nil)
+    val nonPrimitiveTypes = surfaceDefinitions.map(_._2).filter(typeName => !QueryParameterTypes.values.map(_.toString).contains(typeName))
+    println(nonPrimitiveTypes)
+    val nestedDefinitions = nonPrimitiveTypes.flatMap(findDefinition)
+    Seq(surfaceDefinitions) ++ nestedDefinitions
   }
 
   private def extractRouteDefs(code: Seq[Stat], pathSegments: Seq[PathSegment]): Seq[RouteDef] = {

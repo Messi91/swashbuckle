@@ -5,7 +5,9 @@ import com.swashbuckle.components.Components.QueryParameterTypes.QueryParameterT
 
 object Components {
 
-  type SchemaDefinition = Seq[(String, String)]
+  type Schema = Seq[(String, String)]
+
+  case class SchemaDefinition(name: String, schema: Schema)
 
   sealed trait Method
 
