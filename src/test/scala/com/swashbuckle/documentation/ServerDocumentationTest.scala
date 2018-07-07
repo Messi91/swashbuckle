@@ -4,7 +4,7 @@ import java.io.File
 
 import com.swashbuckle.components.Components._
 import com.swashbuckle.components.Components.PathParameterTypes._
-import com.swashbuckle.components.Components.QueryParameterTypes._
+import com.swashbuckle.components.Components.PrimitiveTypes._
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.meta._

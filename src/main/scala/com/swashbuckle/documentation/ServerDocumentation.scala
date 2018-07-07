@@ -3,7 +3,7 @@ package com.swashbuckle.documentation
 import java.io.File
 
 import com.swashbuckle.components.Components.PathParameterTypes.PathParameterType
-import com.swashbuckle.components.Components.QueryParameterTypes.QueryParameterType
+import com.swashbuckle.components.Components.PrimitiveTypes.PrimitiveType
 import com.swashbuckle.components.Components._
 
 import scala.meta._
@@ -69,49 +69,57 @@ object ServerDocumentation {
     }
   }
 
-  private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[Definition] = {
+  private def findClassByName(className: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Option[Stat] = {
+    def findClass(code: Seq[Stat]): Option[Stat] = {
+      code.collect {
+        case clazz @ q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template"
+          if tname.value == className => clazz
+      }.headOption
+    }
+
+    def searchPackages: Option[Stat] = {
+      val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
+      val sources = getSourceFiles(paths).map(_.parse[Source].get)
+      val code = sources.map(extractCode).map(_._2)
+      code.flatMap(findClass).headOption
+    }
+
+    def searchCurrentSource: Option[Stat] = {
+      findClass(currentSource)
+    }
+
     def getSourceFiles(paths: Seq[String]): Seq[File] = {
       paths.map(new File(_)).filter(_ != null).flatMap { directory =>
         Try(directory.listFiles.filter(_.isFile)).toOption.toSeq.flatMap(_.toSeq)
       }
     }
 
-    def findSchema(code: Seq[Stat]): Option[DefinitionFields] = {
-      code.collect {
-        case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == schemaName =>
-          paramss.flatten.map { param =>
-            (param.name.value, param.decltpe.map(_.toString).getOrElse(""))
-          }
-      }.headOption
+    searchCurrentSource match {
+      case clazz @ Some(_) => clazz
+      case None => searchPackages
     }
+  }
 
-    def searchPackages: Option[Definition] = {
-      val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
-      val sources = getSourceFiles(paths).map(_.parse[Source].get)
-      val code = sources.map(extractCode).map(_._2)
-      code.map(findSchema).collect {
-        case Some(schema) => Definition(schemaName, schema)
-      }.headOption
-    }
-
-    def searchCurrentSource: Option[DefinitionFields] = {
-      findSchema(currentSource)
-    }
-
+  private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[Definition] = {
     def findDefinition: Option[Definition] = {
-      searchCurrentSource match {
-        case definition @ Some(_) => definition.map(Definition(schemaName, _))
-        case None => searchPackages
+      findClassByName(schemaName, currentSource,currentPackage, imports).collect {
+        case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == schemaName =>
+          Definition(
+            name = schemaName,
+            schema = paramss.flatten.map { param =>
+              (param.name.value, param.decltpe.map(_.toString).getOrElse(""))
+            }
+          )
       }
     }
 
     def needsDefinition(typeName: String): Boolean = {
-      (typeName != schemaName) && !QueryParameterTypes.values.map(_.toString).contains(typeName)
+      (typeName != schemaName) && !PrimitiveTypes.values.map(_.toString).contains(typeName)
     }
 
-    val surfaceDefinitions = findDefinition.toSeq
-    val nonPrimitiveTypes = surfaceDefinitions.flatMap(_.schema.map(_._2).filter(needsDefinition))
-    surfaceDefinitions ++ nonPrimitiveTypes.flatMap(extractSchemaDefinition(_, currentSource, currentPackage, imports))
+    val surfaceDefinition = findDefinition.toSeq
+    val nonPrimitiveTypes = surfaceDefinition.flatMap(_.schema.map(_._2).filter(needsDefinition))
+    surfaceDefinition ++ nonPrimitiveTypes.flatMap(extractSchemaDefinition(_, currentSource, currentPackage, imports))
   }
 
   private def extractRouteDefs(code: Seq[Stat], pathSegments: Seq[Field]): Seq[RouteDef] = {
@@ -175,15 +183,6 @@ object ServerDocumentation {
     }
 
     def extractResponse(methodDef: String, objects: Seq[String]): Option[Response] = {
-      def findSchema(code: Seq[Stat]): Option[DefinitionFields] = {
-        code.collect {
-          case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" if tname.value == schemaName =>
-            paramss.flatten.map { param =>
-              (param.name.value, param.decltpe.map(_.toString).getOrElse(""))
-            }
-        }.headOption
-      }
-
       val keyword = "onSuccess("
       if (methodDef.contains(keyword)) {
         val start = methodDef.indexOf(keyword) + keyword.length
@@ -285,8 +284,8 @@ object ServerDocumentation {
     Try(PathParameterTypes.withName(parameterType)).toOption
   }
 
-  private def getQueryParameterType(parameterType: String): Option[QueryParameterType] = {
-    Try(QueryParameterTypes.withName(parameterType)).toOption
+  private def getQueryParameterType(parameterType: String): Option[PrimitiveType] = {
+    Try(PrimitiveTypes.withName(parameterType)).toOption
   }
 
   private def sanitizeString(str: String): String = {

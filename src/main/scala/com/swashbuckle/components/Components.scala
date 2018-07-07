@@ -1,7 +1,7 @@
 package com.swashbuckle.components
 
 import com.swashbuckle.components.Components.PathParameterTypes.PathParameterType
-import com.swashbuckle.components.Components.QueryParameterTypes.QueryParameterType
+import com.swashbuckle.components.Components.PrimitiveTypes.PrimitiveType
 
 object Components {
 
@@ -24,9 +24,9 @@ object Components {
 
   case class PathParameter(name: String, `type`: PathParameterType) extends Parameter
 
-  case class QueryParameter(name: String, `type`: QueryParameterType, required: Boolean) extends Parameter
+  case class QueryParameter(name: String, `type`: PrimitiveType, required: Boolean) extends Parameter
 
-  case class ArrayQueryParameter(name: String, `type`: QueryParameterType, collectionFormat: String, required: Boolean) extends Parameter
+  case class ArrayQueryParameter(name: String, `type`: PrimitiveType, collectionFormat: String, required: Boolean) extends Parameter
 
   case class BodyParameter(name: String, schema: String) extends Parameter
 
@@ -63,9 +63,9 @@ object Components {
     val JavaUUID = Value(3, "JavaUUID")
   }
 
-  object QueryParameterTypes extends Enumeration {
+  object PrimitiveTypes extends Enumeration {
 
-    type QueryParameterType = Value
+    type PrimitiveType = Value
 
     val IntType = Value(0, "Int")
 
