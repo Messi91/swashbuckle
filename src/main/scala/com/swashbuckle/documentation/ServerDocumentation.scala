@@ -49,6 +49,14 @@ object ServerDocumentation {
     }.flatten
   }
 
+  private def extractClassBody(code: Stat): Seq[Stat] = {
+    code.collect {
+      case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" => template.collect {
+        case template"{ ..$stats1 } with ..$inits { $self => ..$stats2 }" => stats2
+      }.flatten
+    }.flatten
+  }
+
   private def extractPathSegments(code: Seq[Stat]): Seq[Field] = {
     def inQuotes(value: Term): Boolean = {
       value.toString.startsWith("\"") && value.toString.endsWith("\"")
@@ -180,6 +188,12 @@ object ServerDocumentation {
         val name = segment.substring(nameStart).trim
         Some(BodyParameter(name = name, schema = typeName))
       } else None
+    }
+
+    def getFunction(clazz: Stat, functionName: String): Option[String] = {
+      clazz.collect {
+        case q"..$"
+      }
     }
 
     def extractResponse(methodDef: String, objects: Seq[String]): Option[Response] = {
