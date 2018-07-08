@@ -40,15 +40,13 @@ object Components {
     body: String
   )
 
-  case class RouteDef(
+  case class Path(
     name: String,
     method: Method,
-    path: Seq[String],
+    url: Seq[String],
     parameters: Seq[Parameter],
     responses: Seq[Response]
   )
-
-  case class ServerDocumentation()
 
   object PathParameterTypes extends Enumeration {
 

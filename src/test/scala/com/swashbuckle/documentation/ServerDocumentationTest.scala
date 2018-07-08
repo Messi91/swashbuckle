@@ -13,10 +13,10 @@ class ServerDocumentationTest extends FunSpec with Matchers {
 
   describe("a route documentation") {
     it("should be created from an appropriate source file") {
-      val createMessageRoute = RouteDef(
+      val createMessageRoute = Path(
         name = "createMessage",
         method = Post,
-        path = "path" :: "to" :: "messages" :: Nil,
+        url = "path" :: "to" :: "messages" :: Nil,
         parameters = BodyParameter(
           name = "message",
           schema = "com.swashbuckle.service.Message"
@@ -29,10 +29,10 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val updateMessageRoute = RouteDef(
+      val updateMessageRoute = Path(
         name = "updateMessage",
         method = Put,
-        path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
+        url = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
           `type` = LongNumber
@@ -53,10 +53,10 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val getMessagesRoute = RouteDef(
+      val getMessagesRoute = Path(
         name = "getMessages",
         method = Get,
-        path = "path" :: "to" :: "messages" :: Nil,
+        url = "path" :: "to" :: "messages" :: Nil,
         parameters = ArrayQueryParameter(
           name = "ids",
           required = false,
@@ -79,10 +79,10 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val getMessageRoute = RouteDef(
+      val getMessageRoute = Path(
         name = "getMessage",
         method = Get,
-        path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
+        url = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
           `type` = LongNumber
@@ -95,10 +95,10 @@ class ServerDocumentationTest extends FunSpec with Matchers {
         ) :: Nil
       )
 
-      val deleteMessageRoute = RouteDef(
+      val deleteMessageRoute = Path(
         name = "deleteMessage",
         method = Delete,
-        path = "path" :: "to" :: "messages" :: "{id}" :: Nil,
+        url = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
           name = "id",
           `type` = LongNumber

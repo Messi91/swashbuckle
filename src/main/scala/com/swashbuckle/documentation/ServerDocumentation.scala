@@ -9,30 +9,42 @@ import com.swashbuckle.components.Components._
 import scala.meta._
 import scala.util.Try
 
+case class ServerDocumentation(
+  paths: Seq[Path],
+  definitions: Seq[Definition]
+)
+
 object ServerDocumentation {
 
   private val rootDir = "src/main/scala/"
 
   private val statusMap = Map(
     "StatusCodes.OK" -> 200,
+    "StatusCodes.Created" -> 201,
     "StatusCodes.BadRequest" -> 400,
     "StatusCodes.NotFound" -> 404
   )
 
-  def apply(source: Source): Seq[Definition] = {
+  def apply(source: Source): ServerDocumentation = {
     val (packageName, code) = extractCode(source)
     val imports = extractImports(code)
     val traitBody = extractTraitBody(code)
     val pathSegments = extractPathSegments(traitBody)
     val objects = extractObjectDefinitions(traitBody)
-    val routeDefs = extractRouteDefs(traitBody, pathSegments, objects, code, packageName, imports)
-    val schemaDefinitions = routeDefs.collect {
-      case RouteDef(_, _, _, parameters, _) => parameters.collect {
+    val paths = extractPaths(traitBody, pathSegments, objects, code, packageName, imports)
+    val definitions = paths.collect {
+      case Path(_, _, _, parameters, responses) => parameters.collect {
         case BodyParameter(_, schemaName) =>
+          extractSchemaDefinition(schemaName, code, packageName, imports)
+      }.flatten ++ responses.collect {
+        case Response(_, _, Some(schemaName), _) =>
           extractSchemaDefinition(schemaName, code, packageName, imports)
       }.flatten
     }.flatten.distinct
-    schemaDefinitions
+    ServerDocumentation(
+      paths = paths,
+      definitions = definitions
+    )
   }
 
   private def extractCode(source: Source): (String, Seq[Stat]) = source match {
@@ -132,8 +144,8 @@ object ServerDocumentation {
     surfaceDefinition ++ nonPrimitiveTypes.flatMap(extractSchemaDefinition(_, currentSource, currentPackage, imports))
   }
 
-  private def extractRouteDefs(code: Seq[Stat], pathSegments: Seq[Field], objects: Seq[Field],
-    currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[RouteDef] = {
+  private def extractPaths(code: Seq[Stat], pathSegments: Seq[Field], objects: Seq[Field],
+    currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[Path] = {
     def isRouteDef(routeDef: Term): Boolean = {
       routeDef.toString.startsWith("path(") || routeDef.toString.startsWith("pathPrefix(")
     }
@@ -193,10 +205,10 @@ object ServerDocumentation {
       } else None
     }
 
-    def getFunctionReturnType(clazz: Option[Stat], functionName: String): Option[String] = {
+    def getFunctionReturnType(clazz: Seq[Stat], functionName: String): Option[String] = {
       clazz.collect {
         case q"..$mods def $ename[..$tparams](...$paramss): $tpeopt = $expr" if ename.value == functionName => tpeopt.toString
-      }
+      }.headOption
     }
 
     def getCompletions(string: String, schemaName: String): Seq[(Int, Option[String], Option[String])] = {
@@ -204,8 +216,8 @@ object ServerDocumentation {
       if (!string.contains(keyword)) Nil
       else {
         val start = string.indexOf(keyword) + keyword.length
-        val finish = string.indexOf(")")
-        val response = string.substring(start, finish).trim
+        val segment = string.substring(start).trim
+        val response = segment.substring(0, segment.indexOf(")")).trim
         val completion = if (response.contains(",")) {
           val Array(status, message) = response.split(",").map(_.trim)
           val statusCode = statusMap.getOrElse(status, 200)
@@ -218,7 +230,7 @@ object ServerDocumentation {
             case None => (200, None, Some(schemaName))
           }
         }
-        val theRest = string.substring(finish)
+        val theRest = string.substring(string.length - segment.length)
         Seq(completion) ++ getCompletions(theRest, schemaName)
       }
     }
@@ -227,28 +239,31 @@ object ServerDocumentation {
       val keyword = "onSuccess("
       if (methodDef.contains(keyword)) {
         val start = methodDef.indexOf(keyword) + keyword.length
-        val finish = methodDef.indexOf("}")
-        val segment = methodDef.substring(start, finish)
+        val segment = methodDef.substring(start)
         val serviceCall = segment.substring(0, segment.indexOf(")"))
         val Array(serviceObj, functionSegment) = serviceCall.split("\\.").map(_.trim)
         objects.find(_.name == serviceObj).flatMap { service =>
-          val functionName = if (functionSegment.contains("(")) functionSegment.split("(")(0) else functionSegment
+          val functionName = if (functionSegment.contains("(")) functionSegment.split("\\(")(0) else functionSegment
           val serviceClass = findClassByName(service.value, currentSource, currentPackage, imports)
-          getFunctionReturnType(serviceClass, functionName).map { returnType =>
-            val beforeInnerType = returnType.lastIndexOf("[") + 1
-            val afterInnerType = returnType.indexOf("]")
-            val innerType = returnType.substring(beforeInnerType, afterInnerType)
-            val isArray = returnType.contains("Seq[") || returnType.contains("List[")
-            val responses = getCompletions(segment, innerType).map { case (status, message, schema) =>
-              Response(
-                status = status,
-                message = message,
-                schema = schema,
-                isArray = isArray
-              )
+          serviceClass.map(extractClassBody) match {
+            case Some(parentClass) => getFunctionReturnType(parentClass, functionName).map { returnType =>
+              val beforeInnerType = returnType.lastIndexOf("[") + 1
+              val afterInnerType = returnType.indexOf("]")
+              val innerType = returnType.substring(beforeInnerType, afterInnerType)
+              val isArray = returnType.contains("Seq[") || returnType.contains("List[")
+              val responses = getCompletions(segment, innerType).map { case (status, message, schema) =>
+                Response(
+                  status = status,
+                  message = message,
+                  schema = schema,
+                  isArray = isArray
+                )
+              }
+              responses
             }
-            responses
+            case None => None
           }
+
         }.getOrElse(Nil)
       } else Nil
     }
@@ -259,10 +274,10 @@ object ServerDocumentation {
         val (path, pathParameters) = extractPath(routeDef.toString, pathSegments)
         val methodDefs = extractMethodDefs(routeDef.toString)
         methodDefs.map { methodDef =>
-          RouteDef(
+          Path(
             name = routeName,
             method = methodDef.method,
-            path = path,
+            url = path,
             parameters = pathParameters ++ extractQueryParameters(methodDef.body) ++ extractBodyParameter(methodDef.body),
             responses = extractResponses(methodDef.body, objects, currentSource, currentPackage, imports)
           )
