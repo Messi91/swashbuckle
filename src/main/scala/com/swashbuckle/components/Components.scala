@@ -19,7 +19,6 @@ object Components {
 
   case object Delete extends Method
 
-
   sealed trait Parameter
 
   case class PathParameter(name: String, `type`: PathParameterType) extends Parameter
@@ -31,7 +30,6 @@ object Components {
   case class BodyParameter(name: String, schema: String) extends Parameter
 
   case class Response(status: Int, message: Option[String], schema: Option[String], isArray: Boolean)
-
 
   case class Field(name: String, value: String)
 
