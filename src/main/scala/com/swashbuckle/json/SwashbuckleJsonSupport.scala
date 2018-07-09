@@ -118,8 +118,18 @@ trait SwashbuckleJsonSupport {
   }
 
   implicit object DefinitionFormat extends JsonWriter[Definition] {
-    override def write(obj: Definition): JsValue = {
-      ???
+    override def write(definition: Definition): JsValue = {
+      JsObject(
+        definition.name -> JsObject(
+          "type" -> JsString("object"),
+          "properties" -> JsObject(definition.schema.map { case (fieldName, typeName) =>
+            val (swaggerType, format) = translateDefinitionType(typeName)
+            fieldName -> addFormatField(JsObject(
+              "type" > JsString(swaggerType)
+            ), format)
+          })
+        )
+      )
     }
   }
 
@@ -142,6 +152,14 @@ trait SwashbuckleJsonSupport {
     case PrimitiveTypes.DoubleType => ("number", Some("double"))
     case PrimitiveTypes.StringType => ("string", None)
     case PrimitiveTypes.BooleanType => ("boolean", None)
+  }
+
+  private def translateDefinitionType(`type`: String): (String, Option[String]) = `type` match {
+    case "Int" => ("integer", Some("int32"))
+    case "Long" => ("integer", Some("int64"))
+    case "Double" => ("number", Some("double"))
+    case "String" => ("string", None)
+    case "Boolean" => ("boolean", None)
   }
 
   private def translateMethod(method: Method): String = method match {
