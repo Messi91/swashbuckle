@@ -4,7 +4,7 @@ import com.swashbuckle.components.Components.PathParameterTypes.PathParameterTyp
 import com.swashbuckle.components.Components.PrimitiveTypes.PrimitiveType
 import com.swashbuckle.components.Components._
 import com.swashbuckle.documentation.ServerDocumentation
-import spray.json._
+import spray.json.{JsString, _}
 
 trait SwashbuckleJsonSupport {
 
@@ -49,6 +49,21 @@ trait SwashbuckleJsonSupport {
           case Some(format) => default.copy(fields = default.fields + ("format" -> JsString(format)))
           case None => default
         }
+
+      case QueryParameter(name, primitiveType, required) =>
+        val (typeName, formatOpt) = translateType(primitiveType)
+        val default = JsObject(
+          "name" -> JsString(name),
+          "in" -> JsString("query"),
+          "required" -> JsBoolean(required),
+          "type" -> JsString(typeName)
+        )
+        formatOpt match {
+          case Some(format) => default.copy(fields = default.fields + ("format" -> JsString(format)))
+          case None => default
+        }
+
+      case ArrayQueryParameter()
     }
   }
 
