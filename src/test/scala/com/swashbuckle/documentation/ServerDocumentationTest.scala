@@ -5,11 +5,13 @@ import java.io.File
 import com.swashbuckle.components.Components._
 import com.swashbuckle.components.Components.PathParameterTypes._
 import com.swashbuckle.components.Components.PrimitiveTypes._
+import com.swashbuckle.json.SwashbuckleJsonSupport
 import org.scalatest.{FunSpec, Matchers}
+import spray.json._
 
 import scala.meta._
 
-class ServerDocumentationTest extends FunSpec with Matchers {
+class ServerDocumentationTest extends FunSpec with Matchers with SwashbuckleJsonSupport {
 
   describe("a route documentation") {
     it("should be created from an appropriate source file") {
