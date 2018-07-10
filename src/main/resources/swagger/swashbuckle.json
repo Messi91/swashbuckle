@@ -1,6 +1,26 @@
 {
   "paths": {
     "/path/to/messages": {
+      "post": {
+        "operationId": "createMessage",
+        "produces": ["application/json"],
+        "parameters": [{
+          "in": "body",
+          "name": "message",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/Message"
+          }
+        }],
+        "responses": [{
+          "201": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Message"
+            }
+          }
+        }]
+      },
       "get": {
         "operationId": "getMessages",
         "produces": ["application/json"],
@@ -38,6 +58,47 @@
         }]
       }
     },
+    "/path/to/messages/{id}": {
+      "get": {
+        "operationId": "getMessage",
+        "produces": ["application/json"],
+        "parameters": [{
+          "format": "int64",
+          "name": "id",
+          "in": "path",
+          "type": "integer",
+          "required": true
+        }],
+        "responses": [{
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Message"
+            }
+          }
+        }, {
+          "404": {
+            "description": "Message not found"
+          }
+        }]
+      },
+      "delete": {
+        "operationId": "deleteMessage",
+        "produces": ["application/json"],
+        "parameters": [{
+          "format": "int64",
+          "name": "id",
+          "in": "path",
+          "type": "integer",
+          "required": true
+        }],
+        "responses": [{
+          "200": {
+            "description": "successful operation"
+          }
+        }]
+      }
+    },
     "/path/to/{uuid}/messages/{id}": {
       "put": {
         "operationId": "updateMessage",
@@ -68,24 +129,6 @@
             "schema": {
               "$ref": "#/definitions/Message"
             }
-          }
-        }]
-      }
-    },
-    "/path/to/messages/{id}": {
-      "delete": {
-        "operationId": "deleteMessage",
-        "produces": ["application/json"],
-        "parameters": [{
-          "format": "int64",
-          "name": "id",
-          "in": "path",
-          "type": "integer",
-          "required": true
-        }],
-        "responses": [{
-          "200": {
-            "description": "successful operation"
           }
         }]
       }

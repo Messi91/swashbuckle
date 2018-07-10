@@ -103,17 +103,15 @@ trait SwashbuckleJsonSupport {
   implicit object PathFormat extends JsonWriter[Path] {
     override def write(path: Path): JsValue = {
       JsObject(
-        translateMethod(path.method) -> JsObject(
-          "operationId" -> JsString(sanitizePathName(path.name)),
-          "produces" -> JsArray(
-            JsString("application/json")
-          ),
-          "parameters" -> JsArray(
-            path.parameters.map(_.toJson).toVector
-          ),
-          "responses" -> JsArray(
-            path.responses.map(_.toJson).toVector
-          )
+        "operationId" -> JsString(sanitizePathName(path.name)),
+        "produces" -> JsArray(
+          JsString("application/json")
+        ),
+        "parameters" -> JsArray(
+          path.parameters.map(_.toJson).toVector
+        ),
+        "responses" -> JsArray(
+          path.responses.map(_.toJson).toVector
         )
       )
     }
@@ -141,9 +139,11 @@ trait SwashbuckleJsonSupport {
   implicit object ServerDocumentationFormat extends JsonWriter[ServerDocumentation] {
     override def write(server: ServerDocumentation): JsValue = {
       JsObject(
-        "paths" -> JsObject(server.paths.map { path =>
-          s"/${path.url.mkString("/")}" -> path.toJson
-        }.toMap),
+        "paths" -> JsObject(server.paths.groupBy(path => s"/${path.url.mkString("/")}").map { case (url, paths) =>
+           url -> JsObject(paths.map { path =>
+             translateMethod(path.method) -> path.toJson
+           }.toMap)
+        }),
         "definitions" -> JsObject(server.definitions.map { definition =>
           definition.name -> definition.toJson
         }.toMap)
