@@ -2,7 +2,7 @@
   "paths": {
     "/path/to/messages": {
       "get": {
-        "operationId": "getMessagesRoute",
+        "operationId": "getMessages",
         "produces": ["application/json"],
         "parameters": [{
           "name": "ids",
@@ -13,7 +13,17 @@
           },
           "collectionFormat": "csv",
           "type": "array",
-          "required": true
+          "required": false
+        }, {
+          "name": "type",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        }, {
+          "name": "isPositive",
+          "in": "query",
+          "required": false,
+          "type": "boolean"
         }],
         "responses": [{
           "200": {
@@ -30,7 +40,7 @@
     },
     "/path/to/{uuid}/messages/{id}": {
       "put": {
-        "operationId": "updateMessageRoute",
+        "operationId": "updateMessage",
         "produces": ["application/json"],
         "parameters": [{
           "format": "uuid",
@@ -64,7 +74,7 @@
     },
     "/path/to/messages/{id}": {
       "delete": {
-        "operationId": "deleteMessageRoute",
+        "operationId": "deleteMessage",
         "produces": ["application/json"],
         "parameters": [{
           "format": "int64",

@@ -162,13 +162,20 @@ object ServerDocumentation {
     }
 
     def extractQueryParameters(methodDef: String): Seq[Parameter] = {
+      def pickSplitRegex(parameter: String) = {
+        if (parameter.contains(".as(")) ".as\\("
+        else ".as\\["
+      }
+
       val keyword = "parameters("
       if (methodDef.contains(keyword)) {
         val start = methodDef.indexOf(keyword) + keyword.length
-        val finish = methodDef.indexOf(")")
-        val queryParameters = methodDef.substring(start, finish).split(",").map(word => word.trim).toSeq
+        val finish = methodDef.indexOf("=>")
+        val parametersStr = methodDef.substring(start, finish).split("\\{")(0).trim
+        val queryParameters = parametersStr.split(",").map(word => word.trim.replaceAll("\\)", "")).toSeq
         queryParameters.map { parameter =>
-          val Array(name, typeName) = parameter.split(".as\\(")
+          val splitRegex = pickSplitRegex(parameter)
+          val Array(name, typeName) = parameter.split(splitRegex)
           val required = !parameter.endsWith("?")
           val trimmedType = typeName.split("\\)").head
           if (trimmedType.contains("[")) {
@@ -181,9 +188,10 @@ object ServerDocumentation {
               required = required
             )
           } else {
+            val innerType = trimmedType.substring(0, trimmedType.indexOf("]"))
             QueryParameter(
               name = name.drop(1),
-              `type` = getQueryParameterType(trimmedType).get,
+              `type` = getQueryParameterType(innerType).get,
               required = required
             )
           }

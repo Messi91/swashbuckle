@@ -9,6 +9,7 @@ import com.swashbuckle.json.SwashbuckleJsonSupport
 import org.scalatest.{FunSpec, Matchers}
 import spray.json._
 
+import scala.collection.mutable.ArrayBuffer
 import scala.meta._
 
 class ServerDocumentationTest extends FunSpec with Matchers with SwashbuckleJsonSupport {
@@ -16,53 +17,51 @@ class ServerDocumentationTest extends FunSpec with Matchers with SwashbuckleJson
   describe("a route documentation") {
     it("should be created from an appropriate source file") {
       val createMessageRoute = Path(
-        name = "createMessage",
+        name = "createMessageRoute",
         method = Post,
         url = "path" :: "to" :: "messages" :: Nil,
         parameters = BodyParameter(
           name = "message",
-          schema = "com.swashbuckle.service.Message"
+          schema = "Message"
         ) :: Nil,
         responses = Response(
           status = 201,
           message = None,
-          schema = Some("com.swashbuckle.service.Message"),
+          schema = Some("Message"),
           isArray = false
         ) :: Nil
       )
 
       val updateMessageRoute = Path(
-        name = "updateMessage",
+        name = "updateMessageRoute",
         method = Put,
-        url = "path" :: "to" :: "messages" :: "{id}" :: Nil,
-        parameters = PathParameter(
+        url = "path" :: "to" :: "{uuid}" :: "messages" :: "{id}" :: Nil,
+        parameters = ArrayBuffer(PathParameter(
+          name = "uuid",
+          `type` = JavaUUID
+        ), PathParameter(
           name = "id",
           `type` = LongNumber
-        ) :: BodyParameter(
+        ), BodyParameter(
           name = "update",
-          schema = "com.swashbuckle.service.Message"
-        ) :: Nil,
+          schema = "Message"
+        )),
         responses = Response(
           status = 200,
           message = None,
-          schema = Some("com.swashbuckle.service.Message"),
-          isArray = false
-        ) :: Response(
-          status = 404,
-          message = Some("Message not found"),
-          schema = Some("com.swashbuckle.service.Message"),
+          schema = Some("Message"),
           isArray = false
         ) :: Nil
       )
 
       val getMessagesRoute = Path(
-        name = "getMessages",
+        name = "getMessagesRoute",
         method = Get,
         url = "path" :: "to" :: "messages" :: Nil,
         parameters = ArrayQueryParameter(
           name = "ids",
           required = false,
-          collectionFormat = "csv",
+          collectionFormat = "CsvSeq",
           `type` = LongType
         ) :: QueryParameter(
           name = "type",
@@ -76,13 +75,13 @@ class ServerDocumentationTest extends FunSpec with Matchers with SwashbuckleJson
         responses = Response(
           status = 200,
           message = None,
-          schema = Some("Seq[com.swashbuckle.service.Message]"),
+          schema = Some("Message"),
           isArray = true
         ) :: Nil
       )
 
       val getMessageRoute = Path(
-        name = "getMessage",
+        name = "getMessageRoute",
         method = Get,
         url = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
@@ -92,13 +91,18 @@ class ServerDocumentationTest extends FunSpec with Matchers with SwashbuckleJson
         responses = Response(
           status = 200,
           message = None,
-          schema = Some("com.swashbuckle.service.Message"),
+          schema = Some("Message"),
+          isArray = false
+        ) :: Response(
+          status = 404,
+          message = Some("Message not found"),
+          schema = None,
           isArray = false
         ) :: Nil
       )
 
       val deleteMessageRoute = Path(
-        name = "deleteMessage",
+        name = "deleteMessageRoute",
         method = Delete,
         url = "path" :: "to" :: "messages" :: "{id}" :: Nil,
         parameters = PathParameter(
@@ -113,13 +117,21 @@ class ServerDocumentationTest extends FunSpec with Matchers with SwashbuckleJson
         ) :: Nil
       )
 
-      val expected = createMessageRoute :: updateMessageRoute :: getMessagesRoute :: getMessageRoute :: deleteMessageRoute :: Nil
+      val expected = ServerDocumentation(
+        paths = createMessageRoute :: updateMessageRoute :: getMessagesRoute :: getMessageRoute :: deleteMessageRoute :: Nil,
+        definitions = List(
+          Definition("Message", List(("id", "Long"), ("sender", "Person"), ("content", "String"))),
+          Definition("Person", List(("firstName", "String"), ("lastName", "String"), ("address", "Address"))),
+          Definition("Address", List(("houseNumber", "Int"), ("streetName", "String"), ("postcode", "String")))
+        )
+      )
 
       val source = new File("src/main/scala/com/swashbuckle/service/SampleRoute.scala").parse[Source].get
 
-      //expected shouldBe ServerDocumentation(source)
+      println(expected.toJson.prettyPrint)
+//      println(ServerDocumentation(source).toJson.prettyPrint)
 
-      println(ServerDocumentation(source))
+//      expected shouldBe ServerDocumentation(source)
     }
   }
 }

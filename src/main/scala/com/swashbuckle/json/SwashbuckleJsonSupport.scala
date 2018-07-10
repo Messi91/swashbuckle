@@ -104,7 +104,7 @@ trait SwashbuckleJsonSupport {
     override def write(path: Path): JsValue = {
       JsObject(
         translateMethod(path.method) -> JsObject(
-          "operationId" -> JsString(path.name),
+          "operationId" -> JsString(sanitizePathName(path.name)),
           "produces" -> JsArray(
             JsString("application/json")
           ),
@@ -194,4 +194,8 @@ trait SwashbuckleJsonSupport {
   }
 
   private def tagReference(schemaName: String): String = s"#/definitions/$schemaName"
+
+  private def sanitizePathName(pathName: String): String = {
+    if (pathName.endsWith("Route")) pathName.splitAt(pathName.indexOf("Route"))._1 else pathName
+  }
 }
