@@ -4,10 +4,17 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, PathMatchers, Route}
 import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers.CsvSeq
+import akka.stream.Materializer
 import fommil.sjs.FamilyFormats
 import spray.json._
 
+import scala.concurrent.ExecutionContext
+
 trait SampleRoute extends Directives with SprayJsonSupport with DefaultJsonProtocol with FamilyFormats {
+
+  implicit def routeEc: ExecutionContext
+  implicit val materializer: Materializer
+
   private val pathSegment = "path"
   private val toPathSegment = "to"
   private val messagesPathSegment = "messages"

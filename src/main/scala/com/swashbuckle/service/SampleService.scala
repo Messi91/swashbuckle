@@ -1,15 +1,39 @@
 package com.swashbuckle.service
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class SampleService {
-  def createMessage(message: Message): Future[Message] = Future.successful(message)
 
-  def updateMessage(uuid: Long, message: Message): Future[Message] = Future.successful(message)
+  private var repo = Seq.empty[Message]
 
-  def getMessages: Future[Seq[Message]] = Future.successful(Message.example :: Message.example :: Nil)
+  def createMessage(message: Message): Future[Message] = {
+    Future {
+      repo = repo :+ message
+      message
+    }
+  }
 
-  def getMessage(uuid: Long): Future[Option[Message]] = Future.successful(Some(Message.example))
+  def updateMessage(id: Long, message: Message): Future[Message] = {
+    Future {
+      repo = repo.map {
+        case found @ Message(messageId, _, _) if messageId == id => found.copy(sender = message.sender, content = message.content)
+        case other => other
+      }
+      message
+    }
+  }
 
-  def deleteMessage(uuid: Long): Future[Boolean] = Future.successful(true)
+  def getMessages: Future[Seq[Message]] = Future.successful(repo)
+
+  def getMessage(id: Long): Future[Option[Message]] = Future.successful(repo.find(_.id == id))
+
+  def deleteMessage(id: Long): Future[Boolean] = {
+    Future {
+      val temp = repo.filterNot(_.id == id)
+      val result = temp.size < repo.size
+      repo = temp
+      result
+    }
+  }
 }
