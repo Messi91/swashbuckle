@@ -126,11 +126,14 @@ class ServerDocumentationTest extends FunSpec with Matchers with SwashbuckleJson
         )
       )
 
-      val source = new File("src/main/scala/com/swashbuckle/service/SampleRoute.scala").parse[Source].get
+      val source = new File("src/main/scala/com/swashbuckle/service/SampleServer.scala").parse[Source].get
 
-      println(expected.toJson.prettyPrint)
+      ServerDocumentation(source)
+
+//      val source = new File("src/main/scala/com/swashbuckle/service/SampleRoute.scala").parse[Source].get
+//
 //      println(ServerDocumentation(source).toJson.prettyPrint)
-
+//
 //      expected shouldBe ServerDocumentation(source)
     }
   }

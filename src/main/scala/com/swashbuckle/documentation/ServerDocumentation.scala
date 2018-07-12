@@ -27,24 +27,31 @@ object ServerDocumentation {
 
   def apply(source: Source): ServerDocumentation = {
     val (packageName, code) = extractCode(source)
-    val imports = extractImports(code)
-    val traitBody = extractTraitBody(code)
-    val pathSegments = extractPathSegments(traitBody)
-    val objects = extractObjectDefinitions(traitBody)
-    val paths = extractPaths(traitBody, pathSegments, objects, code, packageName, imports)
-    val definitions = paths.collect {
-      case Path(_, _, _, parameters, responses) => parameters.collect {
-        case BodyParameter(_, schemaName) =>
-          extractSchemaDefinition(schemaName, code, packageName, imports)
-      }.flatten ++ responses.collect {
-        case Response(_, _, Some(schemaName), _) =>
-          extractSchemaDefinition(schemaName, code, packageName, imports)
-      }.flatten
-    }.flatten.distinct
-    ServerDocumentation(
-      paths = paths,
-      definitions = definitions
-    )
+    val extensionNames = getAllExtensionNames(code)
+    val body = extractBody(code)
+    val mainRoutes = extractMainRoutes(body)
+    println(mainRoutes)
+
+//    val imports = extractImports(code)
+//    val traitBody = extractBody(code)
+//    val pathSegments = extractPathSegments(traitBody)
+//    val objects = extractObjectDefinitions(traitBody)
+//    val paths = extractPaths(traitBody, pathSegments, objects, code, packageName, imports)
+//    val definitions = paths.collect {
+//      case Path(_, _, _, parameters, responses) => parameters.collect {
+//        case BodyParameter(_, schemaName) =>
+//          extractSchemaDefinition(schemaName, code, packageName, imports)
+//      }.flatten ++ responses.collect {
+//        case Response(_, _, Some(schemaName), _) =>
+//          extractSchemaDefinition(schemaName, code, packageName, imports)
+//      }.flatten
+//    }.flatten.distinct
+//    ServerDocumentation(
+//      paths = paths,
+//      definitions = definitions
+//    )
+
+    ServerDocumentation(Nil, Nil)
   }
 
   private def extractCode(source: Source): (String, Seq[Stat]) = source match {
@@ -59,19 +66,37 @@ object ServerDocumentation {
     }.flatten
   }
 
-  private def extractTraitBody(code: Seq[Stat]): Seq[Stat] = {
+  private def extractBody(code: Seq[Stat]): Seq[Stat] = {
     code.collect {
       case q"..$mods trait $tname[..$tparams] extends $template" => template.collect {
+        case template"{ ..$stats1 } with ..$inits { $self => ..$stats2 }" => stats2
+      }.flatten
+      case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" => template.collect {
         case template"{ ..$stats1 } with ..$inits { $self => ..$stats2 }" => stats2
       }.flatten
     }.flatten
   }
 
-  private def extractClassBody(code: Stat): Seq[Stat] = {
+  private def getAllExtensionNames(code: Seq[Stat]): Seq[String] = {
     code.collect {
-      case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" => template.collect {
-        case template"{ ..$stats1 } with ..$inits { $self => ..$stats2 }" => stats2
+      case q"..$mods trait $tname[..$tparams] extends $template" => template.collect {
+        case template"{ ..$stats1 } with ..$inits { $self => ..$stats2 }" => inits.map(_.toString)
       }.flatten
+      case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" => template.collect {
+        case template"{ ..$stats1 } with ..$inits { $self => ..$stats2 }" => inits.map(_.toString)
+      }.flatten
+    }.flatten
+  }
+
+  private def extractMainRoutes(code: Seq[Stat]): Seq[String] = {
+    def getRoutes(routeStr: String): Seq[String] = {
+      if (routeStr.contains("~")) routeStr.split("~").map(_.trim) else Seq(routeStr)
+    }
+
+    code.collect {
+      case q"..$mods val ..$name = $value" if name.head.toString == "route" => getRoutes(value.toString)
+      case q"..$mods val ..$name: $tpeopt = $value" if name.head.toString == "route" => getRoutes(value.toString)
+      case q"..$mods def $name[..$tparams](...$paramss): $tpeopt = $expr" if name.toString == "route" => getRoutes(expr.toString)
     }.flatten
   }
 
@@ -96,6 +121,8 @@ object ServerDocumentation {
       code.collect {
         case clazz @ q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template"
           if tname.value == className => clazz
+        case traitt @ q"..$mods trait $tname[..$tparams] extends $template"
+          if tname.value == className => traitt
       }.headOption
     }
 
@@ -230,7 +257,7 @@ object ServerDocumentation {
           val Array(status, message) = response.split(",").map(_.trim)
           val statusCode = statusMap.getOrElse(status, 200)
 
-          if (inQuotes(message)) (statusCode, Some(message), None)
+          if (inQuotes(message)) (statusCode, Some(sanitizeString(message)), None)
           else (statusCode, None, Some(schemaName))
         } else {
           statusMap.get(response) match {
@@ -253,7 +280,7 @@ object ServerDocumentation {
         objects.find(_.name == serviceObj).flatMap { service =>
           val functionName = if (functionSegment.contains("(")) functionSegment.split("\\(")(0) else functionSegment
           val serviceClass = findClassByName(service.value, currentSource, currentPackage, imports)
-          serviceClass.map(extractClassBody) match {
+          serviceClass.map(sc => extractBody(Seq(sc))) match {
             case Some(parentClass) => getFunctionReturnType(parentClass, functionName).map { returnType =>
               val beforeInnerType = returnType.lastIndexOf("[") + 1
               val afterInnerType = returnType.indexOf("]")
