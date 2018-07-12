@@ -28,30 +28,42 @@ object ServerDocumentation {
   def apply(source: Source): ServerDocumentation = {
     val (packageName, code) = extractCode(source)
     val extensionNames = getAllExtensionNames(code)
+    val imports = extractImports(code)
     val body = extractBody(code)
     val mainRoutes = extractMainRoutes(body)
-    println(mainRoutes)
+    val extensionCodes = extensionNames.flatMap { className =>
+      findClassByName(className, code, packageName, imports).map((className, _))
+    }
+    val routeHolders = getRouteHolders(extensionCodes, mainRoutes)
+    val documentations = routeHolders.flatMap { case (sourceName, chosenRoutes) =>
+      findSourceByName(sourceName, code, packageName, imports).map(createDocumentation(_, chosenRoutes))
+    }
+    ServerDocumentation(
+      paths = documentations.flatMap(_.paths).distinct,
+      definitions = documentations.flatMap(_.definitions).distinct
+    )
+  }
 
-//    val imports = extractImports(code)
-//    val traitBody = extractBody(code)
-//    val pathSegments = extractPathSegments(traitBody)
-//    val objects = extractObjectDefinitions(traitBody)
-//    val paths = extractPaths(traitBody, pathSegments, objects, code, packageName, imports)
-//    val definitions = paths.collect {
-//      case Path(_, _, _, parameters, responses) => parameters.collect {
-//        case BodyParameter(_, schemaName) =>
-//          extractSchemaDefinition(schemaName, code, packageName, imports)
-//      }.flatten ++ responses.collect {
-//        case Response(_, _, Some(schemaName), _) =>
-//          extractSchemaDefinition(schemaName, code, packageName, imports)
-//      }.flatten
-//    }.flatten.distinct
-//    ServerDocumentation(
-//      paths = paths,
-//      definitions = definitions
-//    )
-
-    ServerDocumentation(Nil, Nil)
+  private def createDocumentation(source: Source, chosenRoutes: Seq[String]): ServerDocumentation = {
+    val (packageName, code) = extractCode(source)
+    val imports = extractImports(code)
+    val traitBody = extractBody(code)
+    val pathSegments = extractPathSegments(traitBody)
+    val objects = extractObjectDefinitions(traitBody)
+    val paths = extractPaths(traitBody, pathSegments, objects, code, packageName, imports, chosenRoutes)
+    val definitions = paths.collect {
+      case Path(_, _, _, parameters, responses) => parameters.collect {
+        case BodyParameter(_, schemaName) =>
+          extractSchemaDefinition(schemaName, code, packageName, imports)
+      }.flatten ++ responses.collect {
+        case Response(_, _, Some(schemaName), _) =>
+          extractSchemaDefinition(schemaName, code, packageName, imports)
+      }.flatten
+    }.flatten.distinct
+    ServerDocumentation(
+      paths = paths,
+      definitions = definitions
+    )
   }
 
   private def extractCode(source: Source): (String, Seq[Stat]) = source match {
@@ -89,15 +101,30 @@ object ServerDocumentation {
   }
 
   private def extractMainRoutes(code: Seq[Stat]): Seq[String] = {
-    def getRoutes(routeStr: String): Seq[String] = {
-      if (routeStr.contains("~")) routeStr.split("~").map(_.trim) else Seq(routeStr)
-    }
-
     code.collect {
       case q"..$mods val ..$name = $value" if name.head.toString == "route" => getRoutes(value.toString)
       case q"..$mods val ..$name: $tpeopt = $value" if name.head.toString == "route" => getRoutes(value.toString)
       case q"..$mods def $name[..$tparams](...$paramss): $tpeopt = $expr" if name.toString == "route" => getRoutes(expr.toString)
     }.flatten
+  }
+
+  private def getRouteHolders(codes: Seq[(String, Stat)], routeNames: Seq[String]): Seq[(String, Seq[String])] = {
+    def isChosenOne(name: String): Boolean = {
+      routeNames.contains(name)
+    }
+
+    codes.flatMap { code =>
+      val body = extractBody(code._2 :: Nil)
+      body.collect {
+        case q"..$mods val ..$name = $value" if isChosenOne(name.head.toString) => Some((code._1, getRoutes(value.toString)))
+        case q"..$mods val ..$name: $tpeopt = $value" if isChosenOne(name.head.toString) => Some((code._1, getRoutes(value.toString)))
+        case _ => None
+      }.flatten
+    }
+  }
+
+  private def getRoutes(routeStr: String): Seq[String] = {
+    if (routeStr.contains("~")) routeStr.split("~").map(_.trim) else Seq(routeStr)
   }
 
   private def extractPathSegments(code: Seq[Stat]): Seq[Field] = {
@@ -149,6 +176,21 @@ object ServerDocumentation {
     }
   }
 
+  private def findSourceByName(className: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Option[Source] = {
+    def searchPackages: Option[Source] = {
+      val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
+      getSourceFiles(paths).map(_.parse[Source].get).headOption
+    }
+
+    def getSourceFiles(paths: Seq[String]): Seq[File] = {
+      paths.map(new File(_)).filter(_ != null).flatMap { directory =>
+        Try(directory.listFiles.filter(_.isFile)).toOption.toSeq.flatMap(_.toSeq)
+      }
+    }
+
+    searchPackages
+  }
+
   private def extractSchemaDefinition(schemaName: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[Definition] = {
     def findDefinition: Option[Definition] = {
       findClassByName(schemaName, currentSource,currentPackage, imports).collect {
@@ -172,7 +214,7 @@ object ServerDocumentation {
   }
 
   private def extractPaths(code: Seq[Stat], pathSegments: Seq[Field], objects: Seq[Field],
-    currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Seq[Path] = {
+    currentSource: Seq[Stat], currentPackage: String, imports: Seq[String], chosenRoutes: Seq[String]): Seq[Path] = {
     def isRouteDef(routeDef: Term): Boolean = {
       routeDef.toString.startsWith("path(") || routeDef.toString.startsWith("pathPrefix(")
     }
@@ -304,7 +346,7 @@ object ServerDocumentation {
     }
 
     code.collect {
-      case q"..$mods val ..$name = $routeDef" if isRouteDef(routeDef) =>
+      case q"..$mods val ..$name = $routeDef" if chosenRoutes.contains(name.head.toString) && isRouteDef(routeDef) =>
         val routeName = name.head.toString
         val (path, pathParameters) = extractPath(routeDef.toString, pathSegments)
         val methodDefs = extractMethodDefs(routeDef.toString)
