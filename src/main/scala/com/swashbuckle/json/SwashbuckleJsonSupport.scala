@@ -139,6 +139,22 @@ trait SwashbuckleJsonSupport {
   implicit object ServerDocumentationFormat extends JsonWriter[ServerDocumentation] {
     override def write(server: ServerDocumentation): JsValue = {
       JsObject(
+        "swagger" -> JsString("2.0"),
+        "info" -> JsObject(
+          "description" -> JsString(server.config.description),
+          "version" -> JsString(server.config.version),
+          "title" -> JsString(server.config.title),
+          "termsOfService" -> JsString(server.config.termsOfService),
+          "contact" -> JsObject(
+            "email" -> JsString(server.config.email)
+          ),
+          "license" -> JsObject(
+            "name" -> JsString(server.config.licenseName),
+            "url" -> JsString(server.config.licenseUrl)
+          )
+        ),
+        "host" -> JsString(server.config.host),
+        "schemes" -> JsArray(server.config.schemes.map(JsString(_)).toVector),
         "paths" -> JsObject(server.paths.groupBy(path => s"/${path.url.mkString("/")}").map { case (url, paths) =>
            url -> JsObject(paths.map { path =>
              translateMethod(path.method) -> path.toJson

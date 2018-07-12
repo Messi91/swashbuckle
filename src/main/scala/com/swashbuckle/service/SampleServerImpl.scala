@@ -3,7 +3,7 @@ package com.swashbuckle.service
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.stream.ActorMaterializer
-import com.swashbuckle.config.MicroServiceConfig
+import com.swashbuckle.config.{MicroServiceConfig, SwashbuckleConfig}
 
 object SampleServerImpl extends SampleServer with App {
 
@@ -14,6 +14,7 @@ object SampleServerImpl extends SampleServer with App {
 
   override val logger = Logging(system, getClass)
   override val config = MicroServiceConfig
+  override val swashbuckleConfig = SwashbuckleConfig.default
 
   startUp()
 }

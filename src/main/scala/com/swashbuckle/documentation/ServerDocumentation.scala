@@ -5,13 +5,15 @@ import java.io.File
 import com.swashbuckle.components.Components.PathParameterTypes.PathParameterType
 import com.swashbuckle.components.Components.PrimitiveTypes.PrimitiveType
 import com.swashbuckle.components.Components._
+import com.swashbuckle.config.SwashbuckleConfig
 
 import scala.meta._
 import scala.util.Try
 
 case class ServerDocumentation(
   paths: Seq[Path],
-  definitions: Seq[Definition]
+  definitions: Seq[Definition],
+  config: SwashbuckleConfig
 )
 
 object ServerDocumentation {
@@ -25,7 +27,8 @@ object ServerDocumentation {
     "StatusCodes.NotFound" -> 404
   )
 
-  def apply(source: Source): ServerDocumentation = {
+  def apply(config: SwashbuckleConfig): ServerDocumentation = {
+    val source = new File(config.entrypoint).parse[Source].get
     val (packageName, code) = extractCode(source)
     val extensionNames = getAllExtensionNames(code)
     val imports = extractImports(code)
@@ -36,15 +39,16 @@ object ServerDocumentation {
     }
     val routeHolders = getRouteHolders(extensionCodes, mainRoutes)
     val documentations = routeHolders.flatMap { case (sourceName, chosenRoutes) =>
-      findSourceByName(sourceName, code, packageName, imports).map(createDocumentation(_, chosenRoutes))
+      findSourceByName(sourceName, code, packageName, imports).map(createDocumentation(_, chosenRoutes, config))
     }
     ServerDocumentation(
-      paths = documentations.flatMap(_.paths).distinct,
-      definitions = documentations.flatMap(_.definitions).distinct
+      paths = documentations.flatMap(_.paths).distinct.sortBy(_.url.mkString("/")),
+      definitions = documentations.flatMap(_.definitions).distinct.sortBy(_.name),
+      config = config
     )
   }
 
-  private def createDocumentation(source: Source, chosenRoutes: Seq[String]): ServerDocumentation = {
+  private def createDocumentation(source: Source, chosenRoutes: Seq[String], config: SwashbuckleConfig): ServerDocumentation = {
     val (packageName, code) = extractCode(source)
     val imports = extractImports(code)
     val traitBody = extractBody(code)
@@ -62,7 +66,8 @@ object ServerDocumentation {
     }.flatten.distinct
     ServerDocumentation(
       paths = paths,
-      definitions = definitions
+      definitions = definitions,
+      config = config
     )
   }
 
