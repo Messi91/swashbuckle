@@ -148,25 +148,25 @@ object ServerDocumentation {
     }
   }
 
-  private def findClassByName(className: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Option[Stat] = {
-    def findClass(code: Seq[Stat]): Option[Stat] = {
-      code.collect {
-        case clazz @ q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template"
-          if tname.value == className => clazz
-        case traitt @ q"..$mods trait $tname[..$tparams] extends $template"
-          if tname.value == className => traitt
-      }.headOption
-    }
+  private def findClass(className: String, code: Seq[Stat]): Option[Stat] = {
+    code.collect {
+      case clazz @ q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template"
+        if tname.value == className => clazz
+      case traitt @ q"..$mods trait $tname[..$tparams] extends $template"
+        if tname.value == className => traitt
+    }.headOption
+  }
 
+  private def findClassByName(className: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Option[Stat] = {
     def searchPackages: Option[Stat] = {
       val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
       val sources = getSourceFiles(paths).map(_.parse[Source].get)
       val code = sources.map(extractCode).map(_._2)
-      code.flatMap(findClass).headOption
+      code.flatMap(findClass(className, _)).headOption
     }
 
     def searchCurrentSource: Option[Stat] = {
-      findClass(currentSource)
+      findClass(className, currentSource)
     }
 
     def getSourceFiles(paths: Seq[String]): Seq[File] = {
@@ -184,7 +184,9 @@ object ServerDocumentation {
   private def findSourceByName(className: String, currentSource: Seq[Stat], currentPackage: String, imports: Seq[String]): Option[Source] = {
     def searchPackages: Option[Source] = {
       val paths = (Seq(currentPackage) ++ imports).map(packageName => rootDir + packageName.replaceAll("\\.", "/"))
-      getSourceFiles(paths).map(_.parse[Source].get).headOption
+      getSourceFiles(paths).map(_.parse[Source].get).find { source =>
+        findClass(className, extractCode(source)._2).nonEmpty
+      }
     }
 
     def getSourceFiles(paths: Seq[String]): Seq[File] = {
