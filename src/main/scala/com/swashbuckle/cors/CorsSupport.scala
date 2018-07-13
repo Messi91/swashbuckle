@@ -1,17 +1,14 @@
-package com.swashbuckle.service
+package com.swashbuckle.cors
 
 import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.{StatusCodes, HttpResponse}
 import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Directive0, Route}
-import com.typesafe.config.ConfigFactory
 
 trait CorsSupport {
   lazy val allowedOrigin: HttpOrigin = {
-    val config = ConfigFactory.load()
-    val sAllowedOrigin = config.getString("cors.allowed-origin")
-    HttpOrigin(sAllowedOrigin)
+    HttpOrigin("http://petstore.swagger.io")
   }
 
   //this directive adds access control headers to normal responses
